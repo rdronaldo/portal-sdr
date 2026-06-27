@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
 const badgeColor: Record<string, string> = {
@@ -11,124 +9,67 @@ const badgeColor: Record<string, string> = {
   perdido: 'bg-gray-100 text-gray-600',
 }
 
-export default async function LeadDetailPage(props: any) {
-  const { id } = await props.params
+export default async function LeadsPage() {
   const supabase = await createClient()
-
-  const { data: lead } = await supabase
+  const { data: leads } = await supabase
     .from('leads')
     .select('*')
-    .eq('id', id)
-    .single()
-
-  if (!lead) notFound()
-
-  const { data: qualificacao } = await supabase
-    .from('qualificacoes')
-    .select('*')
-    .eq('lead_id', lead.id)
     .order('criado_em', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const { data: conversas } = await supabase
-    .from('conversas')
-    .select('*')
-    .eq('lead_id', lead.id)
-    .order('enviado_em', { ascending: true })
 
   return (
-    <div className="p-8 max-w-4xl">
-      <Link href="/leads" className="text-sm text-[#028090] hover:underline mb-6 inline-block">
-        ← Voltar para Leads
-      </Link>
-
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#0A1628]">{lead.nome || 'Lead sem nome'}</h1>
-          <p className="text-[#64748B] mt-1">{lead.telefone}</p>
-        </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${badgeColor[lead.status] ?? 'bg-gray-100 text-gray-600'}`}>
-          {lead.status}
-        </span>
+    <div className="p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#0A1628]">Leads</h1>
+        <p className="text-[#64748B] mt-1">{leads?.length ?? 0} leads encontrados</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-[#0A1628] mb-4">Informações</h2>
-          <dl className="space-y-3 text-sm">
-            {[
-              ['Telefone', lead.telefone],
-              ['Score', lead.score_qualificacao ?? '—'],
-              ['Produto de interesse', lead.produto_interesse ?? '—'],
-              ['Criado em', lead.criado_em ? new Date(lead.criado_em).toLocaleString('pt-BR') : '—'],
-              ['Atualizado em', lead.atualizado_em ? new Date(lead.atualizado_em).toLocaleString('pt-BR') : '—'],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between">
-                <dt className="text-[#64748B]">{label}</dt>
-                <dd className="font-medium text-[#0A1628]">{String(value)}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        {qualificacao && (
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-[#0A1628] mb-4">Qualificação por IA</h2>
-            <dl className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-[#64748B]">Qualificado</dt>
-                <dd className={`font-medium ${qualificacao.qualificado ? 'text-green-600' : 'text-red-500'}`}>
-                  {qualificacao.qualificado ? 'Sim' : 'Não'}
-                </dd>
-              </div>
-              {qualificacao.score && (
-                <div className="flex justify-between">
-                  <dt className="text-[#64748B]">Score</dt>
-                  <dd className="font-medium text-[#0A1628]">{qualificacao.score}</dd>
-                </div>
-              )}
-            </dl>
-            {qualificacao.motivo && (
-              <div className="mt-4 p-3 bg-[#F8FAFC] rounded-lg text-xs text-[#64748B]">
-                <strong className="block mb-1 text-[#0A1628]">Motivo:</strong>
-                {qualificacao.motivo}
-              </div>
+      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Nome</th>
+              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Telefone</th>
+              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Score</th>
+              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Data</th>
+              <th className="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {leads && leads.length > 0 ? (
+              leads.map((lead) => (
+                <tr key={lead.id} className="border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors">
+                  <td className="px-4 py-3 font-medium text-[#0A1628]">{lead.nome || '—'}</td>
+                  <td className="px-4 py-3 text-[#64748B]">{lead.telefone}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColor[lead.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {lead.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-[#64748B]">{lead.score_qualificacao ?? '—'}</td>
+                  <td className="px-4 py-3 text-[#64748B]">
+                    {lead.criado_em ? new Date(lead.criado_em).toLocaleDateString('pt-BR') : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/leads/${lead.id}`}
+                      className="text-[#028090] hover:underline text-xs font-medium"
+                    >
+                      Ver detalhes →
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-[#64748B]">
+                  Nenhum lead encontrado ainda. Os leads chegarão via WhatsApp + n8n.
+                </td>
+              </tr>
             )}
-          </div>
-        )}
+          </tbody>
+        </table>
       </div>
-
-      {conversas && conversas.length > 0 && (
-        <div className="mt-6 bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-[#0A1628] mb-4">
-            Histórico de conversa ({conversas.length} mensagens)
-          </h2>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {conversas.map((msg: any) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.direcao === 'saida' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl text-sm ${
-                    msg.direcao === 'saida'
-                      ? 'bg-[#028090] text-white'
-                      : 'bg-[#F1F5F9] text-[#0A1628]'
-                  }`}
-                >
-                  <p>{msg.mensagem}</p>
-                  {msg.enviado_em && (
-                    <p className={`text-xs mt-1 ${msg.direcao === 'saida' ? 'text-teal-200' : 'text-[#94A3B8]'}`}>
-                      {new Date(msg.enviado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
