@@ -10,13 +10,18 @@ const badgeColor: Record<string, string> = {
   perdido: 'bg-gray-100 text-gray-600',
 }
 
-export default async function LeadDetailPage({ params }: { params: { id: string } }) {
+type Props = {
+  params: Promise<{ id: string }>
+}
+
+export default async function LeadDetailPage({ params }: Props) {
+  const { id } = await params
   const supabase = await createClient()
 
   const { data: lead } = await supabase
     .from('leads')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!lead) notFound()
@@ -37,12 +42,10 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
 
   return (
     <div className="p-8 max-w-4xl">
-      {/* Voltar */}
       <Link href="/leads" className="text-sm text-[#028090] hover:underline mb-6 inline-block">
         ← Voltar para Leads
       </Link>
 
-      {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#0A1628]">{lead.nome || 'Lead sem nome'}</h1>
@@ -54,7 +57,6 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Dados do lead */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-[#0A1628] mb-4">Informações</h2>
           <dl className="space-y-3 text-sm">
@@ -73,7 +75,6 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
           </dl>
         </div>
 
-        {/* Qualificação */}
         {qualificacao && (
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-[#0A1628] mb-4">Qualificação por IA</h2>
@@ -101,7 +102,6 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
         )}
       </div>
 
-      {/* Histórico de conversas */}
       {conversas && conversas.length > 0 && (
         <div className="mt-6 bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-[#0A1628] mb-4">
