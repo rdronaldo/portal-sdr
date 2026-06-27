@@ -73,44 +73,31 @@ function getTimerStyle(ms: number): { color: string; pulse: boolean } {
   return { color: '#EF4444', pulse: true }
 }
 
-const TEMP_BADGE: Record<string, string> = {
-  quente: 'bg-green-100 text-green-700',
-  morno: 'bg-amber-100 text-amber-700',
-  frio: 'bg-gray-100 text-gray-500',
+// Spec-exact badge configs using style attributes for precise control
+type BadgeStyle = { bg: string; text: string; border: string }
+
+const TEMP_CONFIG: Record<string, BadgeStyle & { emoji: string; label: string }> = {
+  quente: { bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0', emoji: '🔥', label: 'Quente' },
+  morno:  { bg: '#FFFBEB', text: '#92400E', border: '#FDE68A', emoji: '🌡️', label: 'Morno' },
+  frio:   { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1', emoji: '❄️', label: 'Frio' },
 }
 
-const TEMP_EMOJI: Record<string, string> = {
-  quente: '🔥',
-  morno: '🌡️',
-  frio: '❄️',
+const STATUS_PARTNER_CONFIG: Record<string, BadgeStyle & { label: string }> = {
+  recebido:       { bg: '#EFF6FF', text: '#1E40AF', border: '#BFDBFE', label: 'Recebido' },
+  trabalhando:    { bg: '#FFFBEB', text: '#92400E', border: '#FDE68A', label: 'Em andamento' },
+  convertido:     { bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0', label: 'Convertido' },
+  nao_convertido: { bg: '#FEF2F2', text: '#991B1B', border: '#FECACA', label: 'Não convertido' },
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  recebido: 'bg-blue-100 text-blue-700',
-  trabalhando: 'bg-amber-100 text-amber-700',
-  convertido: 'bg-green-100 text-green-700',
-  nao_convertido: 'bg-red-100 text-red-700',
-  novo: 'bg-slate-100 text-slate-600',
-  disparado: 'bg-indigo-100 text-indigo-700',
-  respondeu: 'bg-cyan-100 text-cyan-700',
-  qualificado: 'bg-purple-100 text-purple-700',
-  transferido: 'bg-teal-100 text-teal-700',
-  frio: 'bg-gray-100 text-gray-500',
-  opt_out: 'bg-red-50 text-red-400',
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  recebido: 'Recebido',
-  trabalhando: 'Em andamento',
-  convertido: 'Convertido',
-  nao_convertido: 'Não convertido',
-  novo: 'Novo',
-  disparado: 'Disparado',
-  respondeu: 'Respondeu',
-  qualificado: 'Qualificado',
-  transferido: 'Transferido',
-  frio: 'Frio',
-  opt_out: 'Opt-out',
+// Lead own status (no transferencia)
+const LEAD_STATUS_CONFIG: Record<string, BadgeStyle & { label: string }> = {
+  novo:       { bg: '#F8FAFC', text: '#475569', border: '#CBD5E1', label: 'Novo' },
+  disparado:  { bg: '#EEF2FF', text: '#3730A3', border: '#C7D2FE', label: 'Disparado' },
+  respondeu:  { bg: '#ECFEFF', text: '#155E75', border: '#A5F3FC', label: 'Respondeu' },
+  qualificado:{ bg: '#FAF5FF', text: '#6B21A8', border: '#E9D5FF', label: 'Qualificado' },
+  transferido:{ bg: '#F0FDFA', text: '#065F46', border: '#99F6E4', label: 'Transferido' },
+  frio:       { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1', label: 'Frio' },
+  opt_out:    { bg: '#FEF2F2', text: '#991B1B', border: '#FECACA', label: 'Opt-out' },
 }
 
 // ─── Filter Bar ───────────────────────────────────────────────────────────────
@@ -522,15 +509,15 @@ export default function LeadsClient({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-[#64748B] whitespace-nowrap">Nome</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-[#64748B] whitespace-nowrap">Telefone</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-[#64748B] whitespace-nowrap">Cidade/Estado</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-[#64748B] whitespace-nowrap">Temperatura</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-[#64748B] max-w-[200px]">Resumo da IA</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-[#64748B] whitespace-nowrap">Aguardando/Contatado</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-[#64748B] whitespace-nowrap">Status</th>
-                  <th className="px-4 py-3 text-xs font-medium text-[#64748B] text-right whitespace-nowrap">Ações</th>
+                <tr className="bg-[#F4F8FB] border-b border-[#E2E8F0]">
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Nome</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Telefone</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Cidade/Estado</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Temperatura</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] max-w-[200px]">Resumo da IA</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Aguardando/Contatado</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] text-right whitespace-nowrap">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -562,16 +549,19 @@ export default function LeadsClient({
 
                       {/* Temperatura */}
                       <td className="px-4 py-3">
-                        {qual?.temperatura ? (
+                        {qual?.temperatura && TEMP_CONFIG[qual.temperatura] ? (
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                              TEMP_BADGE[qual.temperatura] ?? 'bg-gray-100 text-gray-500'
-                            }`}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                            style={{
+                              backgroundColor: TEMP_CONFIG[qual.temperatura].bg,
+                              color: TEMP_CONFIG[qual.temperatura].text,
+                              borderColor: TEMP_CONFIG[qual.temperatura].border,
+                            }}
                           >
-                            {TEMP_EMOJI[qual.temperatura] ?? ''} {qual.temperatura}
+                            {TEMP_CONFIG[qual.temperatura].emoji} {TEMP_CONFIG[qual.temperatura].label}
                           </span>
                         ) : (
-                          <span className="text-[#94A3B8] text-xs px-2 py-0.5 rounded-full bg-gray-50">—</span>
+                          <span className="text-[#94A3B8] text-xs">—</span>
                         )}
                       </td>
 
@@ -604,13 +594,21 @@ export default function LeadsClient({
                             onUpdate={(newStatus) => handleStatusUpdate(lead.id, trans.id, newStatus)}
                           />
                         ) : (
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                              STATUS_BADGE[statusKey] ?? 'bg-gray-100 text-gray-500'
-                            }`}
-                          >
-                            {STATUS_LABEL[statusKey] ?? statusKey}
-                          </span>
+                          (() => {
+                            const cfg = LEAD_STATUS_CONFIG[statusKey]
+                            return cfg ? (
+                              <span
+                                className="px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                                style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}
+                              >
+                                {cfg.label}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                                {statusKey}
+                              </span>
+                            )
+                          })()
                         )}
                       </td>
 

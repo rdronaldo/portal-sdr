@@ -56,12 +56,12 @@ function LeadCard({ item }: { item: TransferenciaComLead }) {
       style={style}
       {...listeners}
       {...attributes}
-      className="bg-white rounded-lg border border-[#E2E8F0] p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow select-none"
+      className="bg-white rounded-xl border border-[#E2E8F0] p-3.5 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:border-[#028090]/30 transition-all select-none"
     >
-      <p className="font-medium text-sm text-[#0A1628] truncate">
+      <p className="font-semibold text-sm text-[#0A1628] truncate">
         {item.leads?.nome || 'Sem nome'}
       </p>
-      <p className="text-xs text-[#64748B] mt-1">{item.leads?.telefone || '—'}</p>
+      <p className="text-xs text-[#64748B] mt-1 font-medium">{item.leads?.telefone || '—'}</p>
       <p className="text-xs text-[#94A3B8] mt-1.5">
         {new Date(item.transferido_em).toLocaleDateString('pt-BR')}
       </p>
@@ -99,7 +99,7 @@ function Column({
         className={`space-y-2 min-h-[200px] rounded-xl p-2 transition-colors ${
           isOver
             ? 'bg-[#F0FDFA] ring-2 ring-[#028090] ring-dashed'
-            : 'bg-[#F8FAFC]'
+            : 'bg-[#F4F8FB]'
         }`}
       >
         {items.length > 0 ? (

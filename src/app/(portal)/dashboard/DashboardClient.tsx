@@ -96,27 +96,31 @@ const METRIC_CONFIG = [
     icon: ArrowRightLeft,
     iconColor: '#028090',
     iconBg: '#E0F7FA',
+    numberColor: '#028090',
   },
   {
     key: 'leadsQuentes' as keyof Metrics,
     label: 'Leads Quentes',
     icon: Flame,
-    iconColor: '#10B981',
-    iconBg: '#D1FAE5',
+    iconColor: '#02C39A',
+    iconBg: '#ECFDF5',
+    numberColor: '#02C39A',
   },
   {
     key: 'aguardandoContato' as keyof Metrics,
     label: 'Aguardando Contato',
     icon: Clock,
     iconColor: '#F59E0B',
-    iconBg: '#FEF3C7',
+    iconBg: '#FFFBEB',
+    numberColor: '#F59E0B',
   },
   {
     key: 'convertidos' as keyof Metrics,
     label: 'Convertidos',
     icon: CheckCircle2,
-    iconColor: '#10B981',
-    iconBg: '#D1FAE5',
+    iconColor: '#02C39A',
+    iconBg: '#ECFDF5',
+    numberColor: '#02C39A',
   },
   {
     key: 'naoConvertidos' as keyof Metrics,
@@ -124,13 +128,14 @@ const METRIC_CONFIG = [
     icon: XCircle,
     iconColor: '#EF4444',
     iconBg: '#FEE2E2',
+    numberColor: '#EF4444',
   },
 ]
 
 function MetricCards({ metrics, loading }: { metrics: Metrics; loading: boolean }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-      {METRIC_CONFIG.map(({ key, label, icon: Icon, iconColor, iconBg }) => (
+      {METRIC_CONFIG.map(({ key, label, icon: Icon, iconColor, iconBg, numberColor }) => (
         <div
           key={key}
           className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm flex flex-col gap-3"
@@ -147,7 +152,7 @@ function MetricCards({ metrics, loading }: { metrics: Metrics; loading: boolean 
           {loading ? (
             <Skeleton className="h-8 w-16" />
           ) : (
-            <p className="text-3xl font-bold text-[#0A1628]">{metrics[key]}</p>
+            <p className="text-3xl font-bold" style={{ color: numberColor }}>{metrics[key]}</p>
           )}
         </div>
       ))}
@@ -158,10 +163,10 @@ function MetricCards({ metrics, loading }: { metrics: Metrics; loading: boolean 
 // ─── Funnel ──────────────────────────────────────────────────────────────────
 
 const FUNNEL_STEPS = [
-  { key: 'disparados' as keyof Funnel, label: 'Disparados', color: '#6366F1' },
-  { key: 'responderam' as keyof Funnel, label: 'Responderam', color: '#028090' },
-  { key: 'transferidos' as keyof Funnel, label: 'Transferidos', color: '#F59E0B' },
-  { key: 'convertidos' as keyof Funnel, label: 'Convertidos', color: '#10B981' },
+  { key: 'disparados' as keyof Funnel, label: 'Disparados' },
+  { key: 'responderam' as keyof Funnel, label: 'Responderam' },
+  { key: 'transferidos' as keyof Funnel, label: 'Transferidos' },
+  { key: 'convertidos' as keyof Funnel, label: 'Convertidos' },
 ]
 
 function FunnelChart({ funnel, loading }: { funnel: Funnel; loading: boolean }) {
@@ -169,10 +174,10 @@ function FunnelChart({ funnel, loading }: { funnel: Funnel; loading: boolean }) 
 
   return (
     <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm mb-8">
-      <h2 className="text-sm font-semibold text-[#0A1628] mb-5">Funil de Conversão</h2>
+      <h2 className="text-base font-semibold text-[#0A1628] mb-5">Funil de Conversão</h2>
 
       <div className="space-y-3">
-        {FUNNEL_STEPS.map(({ key, label, color }, i) => {
+        {FUNNEL_STEPS.map(({ key, label }, i) => {
           const value = funnel[key]
           const prev = i > 0 ? funnel[FUNNEL_STEPS[i - 1].key] : null
           const pct = prev && prev > 0 ? Math.round((value / prev) * 100) : null
@@ -180,16 +185,19 @@ function FunnelChart({ funnel, loading }: { funnel: Funnel; loading: boolean }) 
 
           return (
             <div key={key} className="flex items-center gap-4">
-              <div className="w-28 text-right text-xs text-[#64748B] shrink-0">{label}</div>
+              <div className="w-28 text-right text-xs font-semibold text-[#0A1628] shrink-0">{label}</div>
               <div className="flex-1 flex items-center gap-3">
                 {loading ? (
                   <Skeleton className="h-7 flex-1" />
                 ) : (
                   <>
-                    <div className="flex-1 bg-[#F1F5F9] rounded-full h-7 overflow-hidden">
+                    <div className="flex-1 bg-[#E2E8F0] rounded-full h-7 overflow-hidden">
                       <div
                         className="h-full rounded-full flex items-center pl-3 transition-all duration-700"
-                        style={{ width: `${Math.max(barWidth, 4)}%`, backgroundColor: color }}
+                        style={{
+                          width: `${Math.max(barWidth, 4)}%`,
+                          background: 'linear-gradient(to right, #028090, #02C39A)',
+                        }}
                       >
                         <span className="text-white text-xs font-bold whitespace-nowrap">
                           {value}
@@ -432,8 +440,8 @@ export default function DashboardClient({
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#0A1628]">Dashboard</h1>
-        <p className="text-[#64748B] mt-1">Visão geral dos leads qualificados por IA</p>
+        <h1 className="text-2xl font-bold text-[#0A1628]" style={{ fontFamily: 'Inter, sans-serif' }}>Dashboard</h1>
+        <p className="text-sm mt-1" style={{ color: '#64748B' }}>Visão geral dos leads qualificados por IA</p>
       </div>
 
       <MetricCards metrics={data.metrics} loading={false} />

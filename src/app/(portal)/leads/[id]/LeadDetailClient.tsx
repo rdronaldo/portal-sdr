@@ -95,38 +95,26 @@ function formatTime(dateStr: string): string {
   })
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  recebido: 'bg-blue-100 text-blue-700',
-  trabalhando: 'bg-amber-100 text-amber-700',
-  convertido: 'bg-green-100 text-green-700',
-  nao_convertido: 'bg-red-100 text-red-700',
-  novo: 'bg-slate-100 text-slate-600',
-  disparado: 'bg-indigo-100 text-indigo-700',
-  respondeu: 'bg-cyan-100 text-cyan-700',
-  qualificado: 'bg-purple-100 text-purple-700',
-  transferido: 'bg-teal-100 text-teal-700',
-  frio: 'bg-gray-100 text-gray-500',
-  opt_out: 'bg-red-50 text-red-400',
+type BadgeStyle = { bg: string; text: string; border: string }
+
+const ALL_STATUS_CONFIG: Record<string, BadgeStyle & { label: string }> = {
+  recebido:       { bg: '#EFF6FF', text: '#1E40AF', border: '#BFDBFE', label: 'Recebido' },
+  trabalhando:    { bg: '#FFFBEB', text: '#92400E', border: '#FDE68A', label: 'Em andamento' },
+  convertido:     { bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0', label: 'Convertido' },
+  nao_convertido: { bg: '#FEF2F2', text: '#991B1B', border: '#FECACA', label: 'Não convertido' },
+  novo:           { bg: '#F8FAFC', text: '#475569', border: '#CBD5E1', label: 'Novo' },
+  disparado:      { bg: '#EEF2FF', text: '#3730A3', border: '#C7D2FE', label: 'Disparado' },
+  respondeu:      { bg: '#ECFEFF', text: '#155E75', border: '#A5F3FC', label: 'Respondeu' },
+  qualificado:    { bg: '#FAF5FF', text: '#6B21A8', border: '#E9D5FF', label: 'Qualificado' },
+  transferido:    { bg: '#F0FDFA', text: '#065F46', border: '#99F6E4', label: 'Transferido' },
+  frio:           { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1', label: 'Frio' },
+  opt_out:        { bg: '#FEF2F2', text: '#991B1B', border: '#FECACA', label: 'Opt-out' },
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  recebido: 'Recebido',
-  trabalhando: 'Em andamento',
-  convertido: 'Convertido',
-  nao_convertido: 'Não convertido',
-  novo: 'Novo',
-  disparado: 'Disparado',
-  respondeu: 'Respondeu',
-  qualificado: 'Qualificado',
-  transferido: 'Transferido',
-  frio: 'Frio',
-  opt_out: 'Opt-out',
-}
-
-const TEMP_CONFIG: Record<string, { label: string; emoji: string; bg: string; text: string; border: string }> = {
-  quente: { label: 'Quente', emoji: '🔥', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
-  morno: { label: 'Morno', emoji: '🌡️', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-  frio: { label: 'Frio', emoji: '❄️', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+const TEMP_CONFIG: Record<string, BadgeStyle & { label: string; emoji: string; cardBg: string }> = {
+  quente: { bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0', label: 'Quente', emoji: '🔥', cardBg: '#F0FDF4' },
+  morno:  { bg: '#FFFBEB', text: '#92400E', border: '#FDE68A', label: 'Morno',  emoji: '🌡️', cardBg: '#FFFDF0' },
+  frio:   { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1', label: 'Frio',   emoji: '❄️', cardBg: '#F8FAFC' },
 }
 
 const ESFORCO_CONFIG: Record<string, { label: string; color: string }> = {
@@ -213,9 +201,21 @@ function LeadInfo({
       <div>
         <h1 className="text-2xl font-bold text-[#0A1628]">{lead.nome || 'Lead sem nome'}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[statusKey] ?? 'bg-gray-100 text-gray-500'}`}>
-            {STATUS_LABEL[statusKey] ?? statusKey}
-          </span>
+          {(() => {
+            const cfg = ALL_STATUS_CONFIG[statusKey]
+            return cfg ? (
+              <span
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}
+              >
+                {cfg.label}
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                {statusKey}
+              </span>
+            )
+          })()}
           {showTimer && timerStyle && (
             <span
               className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full ${timerStyle.pulse ? 'animate-pulse' : ''}`}
@@ -349,15 +349,23 @@ function QualCard({ qualificacao }: { qualificacao: Qualificacao }) {
 
   return (
     <div
-      className={`rounded-xl border shadow-sm p-6 space-y-5 ${
-        tempConfig ? `${tempConfig.bg} ${tempConfig.border}` : 'bg-white border-[#E2E8F0]'
-      }`}
+      className="rounded-xl border-l-4 shadow-sm p-6 space-y-5"
+      style={{
+        backgroundColor: tempConfig?.cardBg ?? '#F4F8FB',
+        borderLeftColor: '#028090',
+        borderTopColor: '#E2E8F0',
+        borderRightColor: '#E2E8F0',
+        borderBottomColor: '#E2E8F0',
+        border: '1px solid #E2E8F0',
+        borderLeft: '4px solid #028090',
+      }}
     >
       {/* Temperatura badge */}
       {tempConfig && (
         <div className="flex items-center gap-2">
           <span
-            className={`inline-flex items-center gap-2 text-sm font-bold px-4 py-1.5 rounded-full border ${tempConfig.text} ${tempConfig.bg} ${tempConfig.border}`}
+            className="inline-flex items-center gap-2 text-sm font-bold px-4 py-1.5 rounded-full border"
+            style={{ backgroundColor: tempConfig.bg, color: tempConfig.text, borderColor: tempConfig.border }}
           >
             <span className="text-base">{tempConfig.emoji}</span>
             {tempConfig.label}
@@ -367,12 +375,9 @@ function QualCard({ qualificacao }: { qualificacao: Qualificacao }) {
 
       {/* Resumo da IA */}
       {qualificacao.resumo_ia && (
-        <div
-          className="bg-[#F4F8FB] border-l-4 border-[#028090] rounded-r-lg px-4 py-3"
-          style={{ borderLeftColor: '#028090' }}
-        >
+        <div className="bg-white border border-[#E2E8F0] rounded-lg px-4 py-3">
           <p className="text-xs font-semibold text-[#028090] mb-1">Resumo da IA</p>
-          <p className="text-sm text-[#0A1628] leading-relaxed">{qualificacao.resumo_ia}</p>
+          <p className="text-sm text-[#0A1628] leading-relaxed italic">{qualificacao.resumo_ia}</p>
         </div>
       )}
 
@@ -416,7 +421,7 @@ function QualCard({ qualificacao }: { qualificacao: Qualificacao }) {
         {objecoes.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {objecoes.map((obj, i) => (
-              <span key={i} className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+              <span key={i} className="px-2.5 py-0.5 rounded-full text-xs font-medium border" style={{ backgroundColor: '#FEF2F2', color: '#991B1B', borderColor: '#FECACA' }}>
                 {obj}
               </span>
             ))}
@@ -435,7 +440,7 @@ function QualCard({ qualificacao }: { qualificacao: Qualificacao }) {
         {sinais.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {sinais.map((sinal, i) => (
-              <span key={i} className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+              <span key={i} className="px-2.5 py-0.5 rounded-full text-xs font-medium border" style={{ backgroundColor: '#ECFDF5', color: '#065F46', borderColor: '#A7F3D0' }}>
                 {sinal}
               </span>
             ))}
