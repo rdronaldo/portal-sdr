@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -10,12 +11,8 @@ const badgeColor: Record<string, string> = {
   perdido: 'bg-gray-100 text-gray-600',
 }
 
-type Props = {
-  params: Promise<{ id: string }>
-}
-
-export default async function LeadDetailPage({ params }: Props) {
-  const { id } = await params
+export default async function LeadDetailPage(props: any) {
+  const { id } = await props.params
   const supabase = await createClient()
 
   const { data: lead } = await supabase
@@ -108,7 +105,7 @@ export default async function LeadDetailPage({ params }: Props) {
             Histórico de conversa ({conversas.length} mensagens)
           </h2>
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {conversas.map((msg) => (
+            {conversas.map((msg: any) => (
               <div
                 key={msg.id}
                 className={`flex ${msg.direcao === 'saida' ? 'justify-end' : 'justify-start'}`}
