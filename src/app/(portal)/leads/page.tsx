@@ -1,75 +1,113 @@
 import { createClient } from '@/lib/supabase/server'
-import Link from 'next/link'
+import LeadsClient from './LeadsClient'
 
-const badgeColor: Record<string, string> = {
-  novo: 'bg-blue-100 text-blue-700',
-  qualificado: 'bg-green-100 text-green-700',
-  nao_qualificado: 'bg-red-100 text-red-700',
-  transferido: 'bg-purple-100 text-purple-700',
-  perdido: 'bg-gray-100 text-gray-600',
-}
+const PAGE_SIZE = 20
 
-export default async function LeadsPage() {
+export default async function LeadsPage(props: any) {
+  const searchParams = await props.searchParams
+  const page = Math.max(1, parseInt(searchParams?.page || '1', 10))
+  const temperatura = searchParams?.temperatura || ''
+  const status = searchParams?.status || ''
+  const busca = searchParams?.busca || ''
+
   const supabase = await createClient()
-  const { data: leads } = await supabase
+
+  // Step 1: If temperatura filter → get matching lead IDs from qualificacoes
+  let tempLeadIds: string[] | null = null
+  if (temperatura) {
+    const { data } = await supabase
+      .from('qualificacoes')
+      .select('lead_id')
+      .eq('temperatura', temperatura)
+    tempLeadIds = data?.map((q: any) => q.lead_id) ?? []
+    if (tempLeadIds.length === 0) {
+      return (
+        <LeadsClient
+          leads={[]}
+          total={0}
+          page={page}
+          pageSize={PAGE_SIZE}
+          filters={{ temperatura, status, busca }}
+        />
+      )
+    }
+  }
+
+  // Step 2: If status filter → get matching lead IDs from transferencias
+  let statusLeadIds: string[] | null = null
+  if (status) {
+    const { data } = await supabase
+      .from('transferencias')
+      .select('lead_id')
+      .eq('status_parceiro', status)
+    statusLeadIds = data?.map((t: any) => t.lead_id) ?? []
+    if (statusLeadIds.length === 0) {
+      return (
+        <LeadsClient
+          leads={[]}
+          total={0}
+          page={page}
+          pageSize={PAGE_SIZE}
+          filters={{ temperatura, status, busca }}
+        />
+      )
+    }
+  }
+
+  // Step 3: Intersect the two ID sets
+  let filteredIds: string[] | null = null
+  if (tempLeadIds !== null && statusLeadIds !== null) {
+    const tempSet = new Set(tempLeadIds)
+    filteredIds = statusLeadIds.filter((id) => tempSet.has(id))
+    if (filteredIds.length === 0) {
+      return (
+        <LeadsClient
+          leads={[]}
+          total={0}
+          page={page}
+          pageSize={PAGE_SIZE}
+          filters={{ temperatura, status, busca }}
+        />
+      )
+    }
+  } else if (tempLeadIds !== null) {
+    filteredIds = tempLeadIds
+  } else if (statusLeadIds !== null) {
+    filteredIds = statusLeadIds
+  }
+
+  // Step 4: Build main query with pagination
+  let query: any = supabase
     .from('leads')
-    .select('*')
+    .select(
+      `id, nome, telefone, cidade, estado, status, criado_em,
+       transferencias(id, transferido_em, primeiro_contato_em, status_parceiro),
+       qualificacoes(temperatura, resumo_ia)`,
+      { count: 'exact' }
+    )
+
+  if (filteredIds !== null) {
+    query = query.in('id', filteredIds)
+  }
+
+  if (busca) {
+    query = query.or(`nome.ilike.%${busca}%,telefone.ilike.%${busca}%`)
+  }
+
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
+  const { data: leads, count } = await query
+    .range(from, to)
     .order('criado_em', { ascending: false })
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#0A1628]">Leads</h1>
-        <p className="text-[#64748B] mt-1">{leads?.length ?? 0} leads encontrados</p>
-      </div>
-
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Nome</th>
-              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Telefone</th>
-              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Status</th>
-              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Score</th>
-              <th className="text-left px-4 py-3 font-medium text-[#64748B]">Data</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads && leads.length > 0 ? (
-              leads.map((lead) => (
-                <tr key={lead.id} className="border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="px-4 py-3 font-medium text-[#0A1628]">{lead.nome || '—'}</td>
-                  <td className="px-4 py-3 text-[#64748B]">{lead.telefone}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColor[lead.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {lead.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[#64748B]">{lead.score_qualificacao ?? '—'}</td>
-                  <td className="px-4 py-3 text-[#64748B]">
-                    {lead.criado_em ? new Date(lead.criado_em).toLocaleDateString('pt-BR') : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/leads/${lead.id}`}
-                      className="text-[#028090] hover:underline text-xs font-medium"
-                    >
-                      Ver detalhes →
-                    </Link>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-[#64748B]">
-                  Nenhum lead encontrado ainda. Os leads chegarão via WhatsApp + n8n.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <LeadsClient
+      leads={(leads as any) ?? []}
+      total={count ?? 0}
+      page={page}
+      pageSize={PAGE_SIZE}
+      filters={{ temperatura, status, busca }}
+    />
   )
 }
