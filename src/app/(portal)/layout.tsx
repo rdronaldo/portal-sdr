@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
+import { Toaster } from 'sonner'
 
 export default async function PortalLayout({
   children,
@@ -18,6 +19,7 @@ export default async function PortalLayout({
       <main className="flex-1 overflow-auto">
         {children}
       </main>
+      <Toaster position="bottom-right" richColors />
     </div>
   )
 }
