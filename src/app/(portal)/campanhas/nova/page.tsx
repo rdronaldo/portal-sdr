@@ -858,8 +858,10 @@ export default function NovaCampanhaPage() {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
         const parsed = JSON.parse(saved)
-        // Não restaurar leads processados (grande demais) — usuário re-faz upload
-        return { ...initialData, ...parsed, processedLeads: [], rawRows: [], fileName: '' }
+        // Nunca restaurar o código — sempre gerar um novo para evitar duplicatas
+        // Não restaurar leads — muito grande para localStorage
+        const { codigo, versao, processedLeads, rawRows, fileName, ...rest } = parsed
+        return { ...initialData, ...rest, processedLeads: [], rawRows: [], fileName: '' }
       }
     } catch {}
     return initialData
@@ -871,7 +873,8 @@ export default function NovaCampanhaPage() {
       const next = { ...prev, ...d }
       // Persiste no localStorage (exceto leads — muito grande)
       try {
-        const { processedLeads, rawRows, ...toSave } = next
+        // Nunca salvar codigo/versao — sempre gerado fresh ao abrir o wizard
+        const { processedLeads, rawRows, codigo, versao, ...toSave } = next
         localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
       } catch {}
       return next
