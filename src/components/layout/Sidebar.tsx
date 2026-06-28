@@ -4,10 +4,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, Users, Kanban, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, Kanban, LogOut, Menu, X, Megaphone } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/campanhas', label: 'Campanhas', icon: Megaphone },
   { href: '/leads', label: 'Leads', icon: Users },
   { href: '/kanban', label: 'Kanban', icon: Kanban },
 ]
