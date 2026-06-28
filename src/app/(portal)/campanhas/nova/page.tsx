@@ -846,15 +846,42 @@ function Step4({ data, onChange, onBack, onSave, saving }: {
 
 // ─── Main Wizard ──────────────────────────────────────────────────────────────
 
+const STORAGE_KEY = 'wizard_campanha_v1'
+
 export default function NovaCampanhaPage() {
   const router = useRouter()
-  const [step, setStep] = useState(0)
-  const [data, setData] = useState<WizardData>(initialData)
+  const [step, setStep] = useState(() => {
+    try { return parseInt(localStorage.getItem(STORAGE_KEY + '_step') || '0', 10) } catch { return 0 }
+  })
+  const [data, setData] = useState<WizardData>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Não restaurar leads processados (grande demais) — usuário re-faz upload
+        return { ...initialData, ...parsed, processedLeads: [], rawRows: [], fileName: '' }
+      }
+    } catch {}
+    return initialData
+  })
   const [saving, setSaving] = useState(false)
 
   const update = useCallback((d: Partial<WizardData>) => {
-    setData(prev => ({ ...prev, ...d }))
+    setData(prev => {
+      const next = { ...prev, ...d }
+      // Persiste no localStorage (exceto leads — muito grande)
+      try {
+        const { processedLeads, rawRows, ...toSave } = next
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+      } catch {}
+      return next
+    })
   }, [])
+
+  const setStepPersisted = (s: number) => {
+    setStep(s)
+    try { localStorage.setItem(STORAGE_KEY + '_step', String(s)) } catch {}
+  }
 
   const saveCampanha = async (status: 'rascunho' | 'ativa') => {
     setSaving(true)
@@ -937,6 +964,7 @@ export default function NovaCampanhaPage() {
       }).eq('id', camp.id)
 
       toast.success('Campanha salva com sucesso!')
+      try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(STORAGE_KEY + '_step') } catch {}
       router.push(`/campanhas/${camp.id}`)
     } catch (err: any) {
       console.error(err)
@@ -956,10 +984,10 @@ export default function NovaCampanhaPage() {
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-8">
         <StepBar current={step} />
 
-        {step === 0 && <Step1 data={data} onChange={update} onNext={() => setStep(1)} onCancel={() => router.push('/campanhas')} />}
-        {step === 1 && <Step2 data={data} onChange={update} onNext={() => setStep(2)} onBack={() => setStep(0)} />}
-        {step === 2 && <Step3 data={data} onChange={update} onNext={() => setStep(3)} onBack={() => setStep(1)} />}
-        {step === 3 && <Step4 data={data} onChange={update} onBack={() => setStep(2)} onSave={saveCampanha} saving={saving} />}
+        {step === 0 && <Step1 data={data} onChange={update} onNext={() => setStepPersisted(1)} onCancel={() => router.push('/campanhas')} />}
+        {step === 1 && <Step2 data={data} onChange={update} onNext={() => setStepPersisted(2)} onBack={() => setStepPersisted(0)} />}
+        {step === 2 && <Step3 data={data} onChange={update} onNext={() => setStepPersisted(3)} onBack={() => setStepPersisted(1)} />}
+        {step === 3 && <Step4 data={data} onChange={update} onBack={() => setStepPersisted(2)} onSave={saveCampanha} saving={saving} />}
       </div>
     </div>
   )

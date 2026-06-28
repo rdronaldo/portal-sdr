@@ -309,9 +309,15 @@ export default function CampanhasClient({ campanhas: initial }: { campanhas: Cam
                     className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors ${c.is_champion ? 'bg-[#FFFDF0]' : ''}`}
                   >
                     <td className="px-4 py-3">
-                      <span className="font-mono text-xs text-[#0A1628] font-semibold">{c.codigo}</span>
+                      <Link href={`/campanhas/${c.id}`} className="font-mono text-xs font-semibold text-[#028090] hover:underline">
+                        {c.codigo}
+                      </Link>
                     </td>
-                    <td className="px-4 py-3 text-[#0A1628]">{c.nome_descritivo || '—'}</td>
+                    <td className="px-4 py-3">
+                      <Link href={`/campanhas/${c.id}`} className="text-[#0A1628] hover:text-[#028090] transition-colors">
+                        {c.nome_descritivo || '—'}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={c.status} isChampion={c.is_champion} />
                     </td>
