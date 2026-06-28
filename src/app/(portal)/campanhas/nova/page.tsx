@@ -927,32 +927,38 @@ export default function NovaCampanhaPage() {
 
       if (campErr) throw campErr
 
-      // Batch insert leads
+      // Batch insert leads — se falhar, apaga a campanha para não deixar órfã
       const BATCH = 100
-      for (let i = 0; i < finalLeads.length; i += BATCH) {
-        const batch = finalLeads.slice(i, i + BATCH).map(l => ({
-          nome: l.nome,
-          telefone: l.telefone,
-          cnpj: l.cnpj,
-          nome_empresa: l.nome_empresa,
-          cnae: l.cnae,
-          sexo: l.sexo,
-          data_nascimento: l.data_nascimento || null,
-          vida2_data_nascimento: l.vida2_data_nascimento || null,
-          vida3_data_nascimento: l.vida3_data_nascimento || null,
-          renda_estimada: l.renda_estimada,
-          valor_plano_vida1: l.valor_plano_vida1,
-          valor_plano_vida2: l.valor_plano_vida2,
-          valor_plano_vida3: l.valor_plano_vida3,
-          valor_plano_total: l.valor_plano_total,
-          percentual_renda: l.percentual_renda,
-          comissao_entrada: l.comissao_entrada,
-          comissao_recorrente: l.comissao_recorrente,
-          status: 'novo',
-          campanha_id: camp.id,
-        }))
-        const { error: lErr } = await supabase.from('leads').insert(batch)
-        if (lErr) throw lErr
+      try {
+        for (let i = 0; i < finalLeads.length; i += BATCH) {
+          const batch = finalLeads.slice(i, i + BATCH).map(l => ({
+            nome: l.nome || null,
+            telefone: l.telefone || null,
+            cnpj: l.cnpj || null,
+            nome_empresa: l.nome_empresa || null,
+            cnae: l.cnae || null,
+            sexo: l.sexo || null,
+            data_nascimento: l.data_nascimento || null,
+            vida2_data_nascimento: l.vida2_data_nascimento || null,
+            vida3_data_nascimento: l.vida3_data_nascimento || null,
+            renda_estimada: l.renda_estimada || 0,
+            valor_plano_vida1: l.valor_plano_vida1 || 0,
+            valor_plano_vida2: l.valor_plano_vida2 || 0,
+            valor_plano_vida3: l.valor_plano_vida3 || 0,
+            valor_plano_total: l.valor_plano_total || 0,
+            percentual_renda: l.percentual_renda || null,
+            comissao_entrada: l.comissao_entrada || 0,
+            comissao_recorrente: l.comissao_recorrente || 0,
+            status: 'novo',
+            campanha_id: camp.id,
+          }))
+          const { error: lErr } = await supabase.from('leads').insert(batch)
+          if (lErr) throw lErr
+        }
+      } catch (leadsErr: any) {
+        // Apaga a campanha órfã e re-lança o erro com mensagem clara
+        await supabase.from('campanhas').delete().eq('id', camp.id)
+        throw new Error(`Erro ao inserir leads: ${leadsErr?.message ?? leadsErr}`)
       }
 
       const valorTotal = finalLeads.reduce((s, l) => s + l.valor_plano_total, 0)
@@ -971,7 +977,7 @@ export default function NovaCampanhaPage() {
       router.push(`/campanhas/${camp.id}`)
     } catch (err: any) {
       console.error(err)
-      toast.error(`Erro ao salvar: ${err?.message ?? 'tente novamente'}`)
+      toast.error(err?.message ?? 'Erro ao salvar. Tente novamente.')
     } finally {
       setSaving(false)
     }
