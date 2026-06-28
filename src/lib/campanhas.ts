@@ -58,12 +58,21 @@ export async function gerarCodigoCampanha(
   const yyyy = hoje.getFullYear()
   const dataStr = `${dd}${mm}${yyyy}`
   const signo   = getSigno(hoje.getDate(), hoje.getMonth() + 1)
-  const { count } = await supabase
+
+  // Busca todos os códigos do dia para encontrar o próximo sequencial disponível
+  const { data: existing } = await supabase
     .from('campanhas')
-    .select('*', { count: 'exact', head: true })
-    .like('codigo', `${dataStr}%`)
-  const seq = String((count ?? 0) + 1).padStart(4, '0')
-  return `${dataStr}_${signo}_${seq}_${versao}`
+    .select('codigo')
+    .like('codigo', `${dataStr}_%`)
+
+  const usedSeqs = new Set(
+    (existing ?? []).map((r: any) => parseInt(r.codigo.split('_')[2] ?? '0', 10))
+  )
+
+  let seq = 1
+  while (usedSeqs.has(seq)) seq++
+
+  return `${dataStr}_${signo}_${String(seq).padStart(4, '0')}_${versao}`
 }
 
 export function processarLinhaCampanha(row: any, campanha: any) {
