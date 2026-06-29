@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -10,6 +11,12 @@ import {
   CheckCircle2,
   XCircle,
   CheckCheck,
+  Megaphone,
+  Star,
+  Users,
+  DollarSign,
+  Repeat,
+  TrendingUp,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -43,6 +50,32 @@ type AguardandoItem = {
       resumo_ia: string | null
     }> | null
   } | null
+}
+
+type CampanhaTop = {
+  id: string
+  nome_descritivo: string | null
+  codigo: string
+  status: string
+  is_champion: boolean
+  total_leads: number
+  valor_total_potencial: number
+  percentual_conversao: number | null
+}
+
+type CampanhasOverviewData = {
+  ativas: number
+  champion: number
+  totalLeads: number
+  potencialTotal: number
+  recorrenteTotal: number
+  top: CampanhaTop[]
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmt(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
 }
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -84,6 +117,146 @@ function ContactTimer({ transferidoEm, now }: { transferidoEm: string; now: numb
       <Clock size={11} />
       {formatElapsed(elapsed)}
     </span>
+  )
+}
+
+// ─── Campanhas Overview ───────────────────────────────────────────────────────
+
+const STATUS_CFG: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  rascunho:  { label: 'Rascunho',   bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1' },
+  ativa:     { label: 'Ativa',      bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0' },
+  pausada:   { label: 'Pausada',    bg: '#FFFBEB', text: '#92400E', border: '#FDE68A' },
+  encerrada: { label: 'Encerrada',  bg: '#F1F5F9', text: '#374151', border: '#9CA3AF' },
+  champion:  { label: '⭐ Champion', bg: '#FEF9C3', text: '#92400E', border: '#FDE68A' },
+}
+
+function CampanhasOverview({ data }: { data: CampanhasOverviewData }) {
+  const cards = [
+    {
+      label: 'Campanhas ativas',
+      value: data.ativas,
+      icon: Megaphone,
+      color: '#028090',
+      format: 'number',
+    },
+    {
+      label: 'Champion',
+      value: data.champion,
+      icon: Star,
+      color: '#F59E0B',
+      format: 'number',
+    },
+    {
+      label: 'Leads na base',
+      value: data.totalLeads,
+      icon: Users,
+      color: '#028090',
+      format: 'number',
+    },
+    {
+      label: 'Potencial total',
+      value: data.potencialTotal,
+      icon: DollarSign,
+      color: '#02C39A',
+      format: 'currency',
+    },
+    {
+      label: 'Recorrente/mês',
+      value: data.recorrenteTotal,
+      icon: Repeat,
+      color: '#02C39A',
+      format: 'currency',
+    },
+  ]
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-base font-bold text-[#0A1628]">Campanhas</h2>
+          <p className="text-xs text-[#94A3B8] mt-0.5">Visão consolidada das campanhas ativas</p>
+        </div>
+        <Link href="/campanhas"
+          className="text-xs font-medium text-[#028090] hover:underline">
+          Ver todas →
+        </Link>
+      </div>
+
+      {/* Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {cards.map(({ label, value, icon: Icon, color, format }) => (
+          <div key={label} className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-[#64748B] leading-tight">{label}</p>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: color + '18' }}>
+                <Icon size={16} style={{ color }} />
+              </div>
+            </div>
+            <p className="text-2xl font-bold" style={{ color: '#0A1628' }}>
+              {format === 'currency' ? fmt(value as number) : (value as number).toLocaleString('pt-BR')}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Top campanhas table */}
+      {data.top.length > 0 && (
+        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+            <p className="text-sm font-semibold text-[#0A1628]">Top campanhas por volume</p>
+            <span className="text-xs text-[#94A3B8]">{data.top.length} exibidas</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                  {['Campanha', 'Status', 'Leads', 'Potencial', 'Conv. est.', 'Recorrente/mês'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.top.map(c => {
+                  const statusKey = c.is_champion ? 'champion' : (c.status in STATUS_CFG ? c.status : 'rascunho')
+                  const scfg = STATUS_CFG[statusKey]
+                  const recorrente = c.valor_total_potencial * 0.02
+                  return (
+                    <tr key={c.id} className="border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors">
+                      <td className="px-4 py-3">
+                        <Link href={`/campanhas/${c.id}`}
+                          className="font-medium text-[#028090] hover:underline block leading-tight">
+                          {c.nome_descritivo || c.codigo}
+                        </Link>
+                        <span className="text-xs text-[#94A3B8] font-mono">{c.codigo}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium border"
+                          style={{ backgroundColor: scfg.bg, color: scfg.text, borderColor: scfg.border }}>
+                          {scfg.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-[#0A1628]">
+                        {c.total_leads.toLocaleString('pt-BR')}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-[#028090]">
+                        {fmt(c.valor_total_potencial)}
+                      </td>
+                      <td className="px-4 py-3 text-[#64748B]">
+                        {c.percentual_conversao != null ? `${c.percentual_conversao}%` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-[#02C39A] font-medium">
+                        {fmt(recorrente)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -134,28 +307,34 @@ const METRIC_CONFIG = [
 
 function MetricCards({ metrics, loading }: { metrics: Metrics; loading: boolean }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-      {METRIC_CONFIG.map(({ key, label, icon: Icon, iconColor, iconBg, numberColor }) => (
-        <div
-          key={key}
-          className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm flex flex-col gap-3"
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-[#64748B] leading-tight">{label}</p>
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: iconBg }}
-            >
-              <Icon size={16} style={{ color: iconColor }} />
+    <div className="mb-8">
+      <div className="mb-4">
+        <h2 className="text-base font-bold text-[#0A1628]">Kanban & Conversão</h2>
+        <p className="text-xs text-[#94A3B8] mt-0.5">Leads transferidos e trabalhados pelo time</p>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {METRIC_CONFIG.map(({ key, label, icon: Icon, iconColor, iconBg, numberColor }) => (
+          <div
+            key={key}
+            className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm flex flex-col gap-3"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-[#64748B] leading-tight">{label}</p>
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: iconBg }}
+              >
+                <Icon size={16} style={{ color: iconColor }} />
+              </div>
             </div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <p className="text-3xl font-bold" style={{ color: numberColor }}>{metrics[key]}</p>
+            )}
           </div>
-          {loading ? (
-            <Skeleton className="h-8 w-16" />
-          ) : (
-            <p className="text-3xl font-bold" style={{ color: numberColor }}>{metrics[key]}</p>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
@@ -281,13 +460,11 @@ function WaitingTable({
   const [modalItem, setModalItem] = useState<AguardandoItem | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // Update "now" every 30 seconds for the timer
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30000)
     return () => clearInterval(interval)
   }, [])
 
-  // Sync with server data when it arrives
   useEffect(() => {
     setItems(initialItems)
   }, [initialItems])
@@ -430,6 +607,7 @@ export type DashboardData = {
   metrics: Metrics
   funnel: Funnel
   aguardandoLista: AguardandoItem[]
+  campanhas: CampanhasOverviewData
 }
 
 export default function DashboardClient({
@@ -440,12 +618,22 @@ export default function DashboardClient({
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#0A1628]" style={{ fontFamily: 'Inter, sans-serif' }}>Dashboard</h1>
-        <p className="text-sm mt-1" style={{ color: '#64748B' }}>Visão geral dos leads qualificados por IA</p>
+        <h1 className="text-2xl font-bold text-[#0A1628]">Dashboard</h1>
+        <p className="text-sm mt-1 text-[#64748B]">Visão geral dos leads qualificados por IA</p>
       </div>
 
+      {/* Campanhas overview — topo */}
+      <CampanhasOverview data={data.campanhas} />
+
+      <hr className="border-[#E2E8F0] mb-8" />
+
+      {/* Kanban metrics */}
       <MetricCards metrics={data.metrics} loading={false} />
+
+      {/* Funil */}
       <FunnelChart funnel={data.funnel} loading={false} />
+
+      {/* Aguardando contato */}
       <WaitingTable initialItems={data.aguardandoLista} loading={false} />
     </div>
   )

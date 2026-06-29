@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, Star, Pause, Play, XCircle, Users, TrendingUp,
-  DollarSign, Repeat, ChevronLeft, ChevronRight, Target,
+  DollarSign, Repeat, ChevronLeft, ChevronRight, Target, Download,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -599,6 +599,40 @@ export default function CampanhaDetailClient({ campanha: initial, leads: initial
   const [actioning, setActioning] = useState(false)
   const [showSelecao, setShowSelecao] = useState(false)
   const [transferindo, setTransferindo] = useState(false)
+  const [exportando, setExportando] = useState(false)
+
+  const exportarExcel = async () => {
+    setExportando(true)
+    try {
+      const XLSX = await import('xlsx')
+      const rows = leads.map(l => {
+        const age = calcIdade(l.data_nascimento)
+        return {
+          'Nome': l.nome || '',
+          'Sexo': l.sexo || '',
+          'Idade': age !== null ? age : '',
+          'Data Nasc.': l.data_nascimento || '',
+          'Renda Estimada (R$)': l.renda_estimada ?? '',
+          'Valor Plano (R$)': l.valor_plano_total,
+          '% da Renda': l.percentual_renda ?? '',
+          'Com. Entrada (R$)': l.comissao_entrada,
+          'Recorrente/mês (R$)': l.comissao_recorrente,
+          'Status': l.status,
+          'Criado em': new Date(l.criado_em).toLocaleDateString('pt-BR'),
+        }
+      })
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Leads')
+      const filename = `${campanha.codigo}_leads.xlsx`
+      XLSX.writeFile(wb, filename)
+      toast.success(`Exportado: ${filename}`)
+    } catch (err) {
+      toast.error('Erro ao exportar Excel')
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const pct = campanha.percentual_conversao ?? 0
   const leadsConv = Math.round(campanha.total_leads * (pct / 100))
@@ -708,6 +742,16 @@ export default function CampanhaDetailClient({ campanha: initial, leads: initial
             )}
           </div>
           <div className="flex gap-2 flex-wrap">
+            {/* Exportar Excel */}
+            <button
+              onClick={exportarExcel}
+              disabled={exportando || leads.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] transition-colors disabled:opacity-50"
+            >
+              <Download size={13} />
+              {exportando ? 'Exportando...' : 'Excel'}
+            </button>
+
             {/* Seleção Inteligente */}
             <button
               onClick={() => setShowSelecao(true)}
