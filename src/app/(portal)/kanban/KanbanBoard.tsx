@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import {
   DndContext,
   DragEndEvent,
@@ -60,9 +61,13 @@ function LeadCard({ item }: { item: TransferenciaComLead }) {
       {...attributes}
       className="bg-white rounded-xl border border-[#E2E8F0] p-3.5 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:border-[#028090]/30 transition-all select-none"
     >
-      <p className="font-semibold text-sm text-[#0A1628] truncate">
+      <Link
+        href={`/leads/${item.lead_id}`}
+        onClick={e => e.stopPropagation()}
+        className="font-semibold text-sm text-[#028090] hover:underline truncate block"
+      >
         {item.leads?.nome || 'Sem nome'}
-      </p>
+      </Link>
       <p className="text-xs text-[#64748B] mt-1 font-medium">{item.leads?.telefone || '—'}</p>
       <p className="text-xs text-[#94A3B8] mt-1.5">
         {new Date(item.transferido_em).toLocaleDateString('pt-BR')}
