@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, Star, Pause, Play, XCircle, Users, TrendingUp,
-  DollarSign, Repeat, ChevronLeft, ChevronRight,
+  DollarSign, Repeat, ChevronLeft, ChevronRight, Target,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -51,6 +51,14 @@ type Lead = {
   criado_em: string
 }
 
+type SelecaoFiltros = {
+  maxPctRenda: number
+  faixasEtarias: string[]
+  rendaMinima: number
+  quantidade: number
+  ordenarPor: 'menor_pct' | 'maior_renda' | 'faixa_intermediaria'
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -78,6 +86,23 @@ const CANAL_LABEL: Record<string, string> = {
   sms: '💬 SMS', telefone: '📞 Telefone',
 }
 
+const FAIXAS_ETARIAS = [
+  { key: '19-28', label: '19–28 anos', default: true },
+  { key: '29-38', label: '29–38 anos', default: true },
+  { key: '39-48', label: '39–48 anos', default: true },
+  { key: '0-18',  label: '0–18 anos',  default: false },
+  { key: '49-58', label: '49–58 anos', default: false },
+  { key: '59+',   label: '59+ anos',   default: false },
+]
+
+const DEFAULT_FILTROS: SelecaoFiltros = {
+  maxPctRenda: 10,
+  faixasEtarias: ['19-28', '29-38', '39-48'],
+  rendaMinima: 3000,
+  quantidade: 50,
+  ordenarPor: 'menor_pct',
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmt(v: number) {
@@ -91,18 +116,24 @@ function fmtPct(v: number | null): string {
 
 function calcIdade(dob: string | null): number | null {
   if (!dob) return null
-  // Parse date parts manually to avoid UTC vs local timezone issues
   const parts = dob.split('-')
   if (parts.length < 3) return null
-  const ano = parseInt(parts[0], 10)
-  const mes = parseInt(parts[1], 10) - 1
-  const dia = parseInt(parts[2], 10)
-  const d = new Date(ano, mes, dia)
+  const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
   const hoje = new Date()
   let idade = hoje.getFullYear() - d.getFullYear()
   const m = hoje.getMonth() - d.getMonth()
   if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--
   return idade
+}
+
+function getFaixaKey(age: number | null): string | null {
+  if (age === null) return null
+  if (age <= 18) return '0-18'
+  if (age <= 28) return '19-28'
+  if (age <= 38) return '29-38'
+  if (age <= 48) return '39-48'
+  if (age <= 58) return '49-58'
+  return '59+'
 }
 
 function rendaColor(pct: number | null): { bg: string; text: string } {
@@ -112,13 +143,51 @@ function rendaColor(pct: number | null): { bg: string; text: string } {
   return { bg: '#FEF2F2', text: '#991B1B' }
 }
 
+// ─── Filter logic ─────────────────────────────────────────────────────────────
+
+function filtrarLeads(leads: Lead[], filtros: SelecaoFiltros): Lead[] {
+  let result = leads.filter(l => {
+    // Excluir já transferidos
+    if (l.status === 'transferido') return false
+    // Filtro de renda mínima
+    if ((l.renda_estimada ?? 0) < filtros.rendaMinima) return false
+    // Filtro de % da renda (só aplica se tiver percentual_renda)
+    if (l.percentual_renda != null && l.percentual_renda > filtros.maxPctRenda) return false
+    // Filtro de faixa etária
+    if (filtros.faixasEtarias.length > 0) {
+      const age = calcIdade(l.data_nascimento)
+      const faixa = getFaixaKey(age)
+      if (!faixa || !filtros.faixasEtarias.includes(faixa)) return false
+    }
+    return true
+  })
+
+  // Ordenação
+  if (filtros.ordenarPor === 'menor_pct') {
+    result = result.sort((a, b) => (a.percentual_renda ?? 999) - (b.percentual_renda ?? 999))
+  } else if (filtros.ordenarPor === 'maior_renda') {
+    result = result.sort((a, b) => (b.renda_estimada ?? 0) - (a.renda_estimada ?? 0))
+  } else if (filtros.ordenarPor === 'faixa_intermediaria') {
+    // Prioriza 29–43 (dentro de 29-48)
+    const prioMap: Record<string, number> = { '29-38': 0, '39-48': 1, '19-28': 2, '49-58': 3, '0-18': 4, '59+': 5 }
+    result = result.sort((a, b) => {
+      const fa = getFaixaKey(calcIdade(a.data_nascimento)) ?? '59+'
+      const fb = getFaixaKey(calcIdade(b.data_nascimento)) ?? '59+'
+      return (prioMap[fa] ?? 9) - (prioMap[fb] ?? 9)
+    })
+  }
+
+  return result.slice(0, filtros.quantidade)
+}
+
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status, isChampion }: { status: string; isChampion: boolean }) {
   const key = isChampion ? 'champion' : (status in STATUS_CFG ? status : 'rascunho')
   const cfg = STATUS_CFG[key]
   return (
-    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border" style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
+    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border"
+      style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
       {cfg.label}
     </span>
   )
@@ -175,8 +244,6 @@ function DistBar({ label, pct, color }: { label: string; pct: number; color: str
   )
 }
 
-// ─── Lead Status Distribution ─────────────────────────────────────────────────
-
 function LeadsDist({ leads }: { leads: Lead[] }) {
   const total = leads.length
   if (total === 0) return null
@@ -187,15 +254,11 @@ function LeadsDist({ leads }: { leads: Lead[] }) {
     <div className="space-y-2">
       {sorted.map(([status, count]) => {
         const cfg = LEAD_STATUS[status] ?? { label: status, text: '#64748B' }
-        return (
-          <DistBar key={status} label={cfg.label} pct={(count / total) * 100} color={cfg.text} />
-        )
+        return <DistBar key={status} label={cfg.label} pct={(count / total) * 100} color={cfg.text} />
       })}
     </div>
   )
 }
-
-// ─── Age Distribution (Correção 2) ────────────────────────────────────────────
 
 function AgesDist({ leads }: { leads: Lead[] }) {
   const total = leads.length
@@ -216,19 +279,15 @@ function AgesDist({ leads }: { leads: Lead[] }) {
           return age !== null && f.test(age)
         }).length
         return (
-          <DistBar
-            key={f.label}
-            label={`${f.label} (${count})`}
-            pct={total > 0 ? (count / total) * 100 : 0}
-            color="#028090"
-          />
+          <DistBar key={f.label} label={`${f.label} (${count})`}
+            pct={total > 0 ? (count / total) * 100 : 0} color="#028090" />
         )
       })}
     </div>
   )
 }
 
-// ─── Leads Table (Correção 3) ─────────────────────────────────────────────────
+// ─── Leads Table ──────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 20
 
@@ -238,9 +297,8 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const slice = leads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  if (total === 0) {
+  if (total === 0)
     return <p className="text-sm text-[#94A3B8] text-center py-8">Nenhum lead nesta campanha ainda.</p>
-  }
 
   return (
     <div>
@@ -249,9 +307,7 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
           <thead>
             <tr className="bg-[#F4F8FB] border-b border-[#E2E8F0]">
               {['Nome', 'Sexo', 'Idade', 'Valor plano', '% da Renda', 'Com. entrada', 'Rec./mês', 'Status'].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">
-                  {h}
-                </th>
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
@@ -262,39 +318,30 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
               const pct = l.percentual_renda
               const rColor = rendaColor(pct)
               const hasRenda = l.renda_estimada != null && l.renda_estimada > 0
-              const tooltipText = hasRenda && pct != null
+              const tooltip = hasRenda && pct != null
                 ? `Renda estimada: ${fmt(l.renda_estimada!)} | Plano: ${fmt(l.valor_plano_total)} | ${fmtPct(pct)} comprometido`
                 : undefined
-
               return (
                 <tr key={l.id} className="border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors">
                   <td className="px-4 py-2.5">
-                    <Link href={`/leads/${l.id}`} className="font-medium text-[#028090] hover:underline">
-                      {l.nome || '—'}
-                    </Link>
+                    <Link href={`/leads/${l.id}`} className="font-medium text-[#028090] hover:underline">{l.nome || '—'}</Link>
                   </td>
                   <td className="px-4 py-2.5 text-[#64748B]">{l.sexo || '—'}</td>
                   <td className="px-4 py-2.5 text-[#0A1628]">{age !== null ? `${age}a` : '—'}</td>
                   <td className="px-4 py-2.5 font-medium text-[#0A1628]">{fmt(l.valor_plano_total)}</td>
-
-                  {/* % da Renda */}
-                  <td className="px-4 py-2.5" title={tooltipText}>
+                  <td className="px-4 py-2.5" title={tooltip}>
                     {hasRenda && pct != null ? (
-                      <span
-                        className="px-2 py-0.5 rounded-full text-xs font-semibold cursor-help"
-                        style={{ backgroundColor: rColor.bg, color: rColor.text }}
-                      >
+                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold cursor-help"
+                        style={{ backgroundColor: rColor.bg, color: rColor.text }}>
                         {fmtPct(pct)}
                       </span>
-                    ) : (
-                      <span className="text-[#94A3B8] text-xs">—</span>
-                    )}
+                    ) : <span className="text-[#94A3B8] text-xs">—</span>}
                   </td>
-
                   <td className="px-4 py-2.5 text-[#028090]">{fmt(l.comissao_entrada)}</td>
                   <td className="px-4 py-2.5 text-[#02C39A]">{fmt(l.comissao_recorrente)}</td>
                   <td className="px-4 py-2.5">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium border" style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium border"
+                      style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
                       {cfg.label}
                     </span>
                   </td>
@@ -304,7 +351,6 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
           </tbody>
         </table>
       </div>
-
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-[#E2E8F0]">
           <span className="text-xs text-[#64748B]">
@@ -312,13 +358,9 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
           </span>
           <div className="flex gap-1">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] transition-colors disabled:opacity-40">
-              <ChevronLeft size={14} />
-            </button>
+              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] disabled:opacity-40"><ChevronLeft size={14} /></button>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] transition-colors disabled:opacity-40">
-              <ChevronRight size={14} />
-            </button>
+              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] disabled:opacity-40"><ChevronRight size={14} /></button>
           </div>
         </div>
       )}
@@ -326,14 +368,237 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
   )
 }
 
+// ─── Seleção Inteligente Modal ────────────────────────────────────────────────
+
+function SelecaoModal({
+  leads,
+  onClose,
+  onConfirm,
+}: {
+  leads: Lead[]
+  onClose: () => void
+  onConfirm: (selected: Lead[]) => void
+}) {
+  const [filtros, setFiltros] = useState<SelecaoFiltros>(DEFAULT_FILTROS)
+  const [saving, setSaving] = useState(false)
+  const [confirmarMenos, setConfirmarMenos] = useState(false)
+
+  const candidatos = useMemo(() => {
+    // Sem limite para o preview
+    const semLimite = { ...filtros, quantidade: 99999 }
+    return filtrarLeads(leads, semLimite)
+  }, [leads, filtros])
+
+  const selecionados = useMemo(() => {
+    return filtrarLeads(leads, filtros)
+  }, [leads, filtros])
+
+  const toggleFaixa = (key: string) => {
+    setFiltros(prev => ({
+      ...prev,
+      faixasEtarias: prev.faixasEtarias.includes(key)
+        ? prev.faixasEtarias.filter(f => f !== key)
+        : [...prev.faixasEtarias, key],
+    }))
+  }
+
+  const temMenosQueDesejado = candidatos.length < filtros.quantidade
+
+  const handleConfirm = () => {
+    if (temMenosQueDesejado && !confirmarMenos) {
+      setConfirmarMenos(true)
+      return
+    }
+    onConfirm(selecionados)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-[#E2E8F0]">
+          <h2 className="text-base font-bold text-[#0A1628] flex items-center gap-2">
+            🎯 Selecionar Leads Propensos à Compra
+          </h2>
+          <p className="text-xs text-[#64748B] mt-1">Configure os critérios de seleção abaixo</p>
+        </div>
+
+        <div className="px-6 py-5 space-y-6">
+          {/* % máximo da renda */}
+          <div>
+            <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">
+              % máximo da renda comprometida
+            </label>
+            <div className="flex items-center gap-4">
+              <input type="range" min={0} max={30} step={1}
+                value={filtros.maxPctRenda}
+                onChange={e => setFiltros(prev => ({ ...prev, maxPctRenda: parseInt(e.target.value) }))}
+                className="flex-1 accent-[#028090]"
+              />
+              <span className="text-sm font-bold text-[#028090] w-14 text-right">
+                até {filtros.maxPctRenda}%
+              </span>
+            </div>
+            <p className="text-xs text-[#94A3B8] mt-1">
+              Plano acessível: custo ≤ {filtros.maxPctRenda}% do faturamento mensal
+            </p>
+          </div>
+
+          {/* Faixa etária */}
+          <div>
+            <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">
+              Faixa etária do responsável
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {FAIXAS_ETARIAS.map(f => (
+                <label key={f.key} className="flex items-center gap-2 cursor-pointer text-sm text-[#0A1628]">
+                  <input
+                    type="checkbox"
+                    checked={filtros.faixasEtarias.includes(f.key)}
+                    onChange={() => toggleFaixa(f.key)}
+                    className="accent-[#028090] w-4 h-4"
+                  />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Renda mínima */}
+          <div>
+            <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">
+              Renda mínima estimada
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[#64748B]">R$</span>
+              <input
+                type="number" min={0} step={500}
+                value={filtros.rendaMinima}
+                onChange={e => setFiltros(prev => ({ ...prev, rendaMinima: parseInt(e.target.value) || 0 }))}
+                className="flex-1 border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#028090]/30 focus:border-[#028090]"
+              />
+            </div>
+          </div>
+
+          {/* Quantidade */}
+          <div>
+            <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">
+              Quantidade máxima a selecionar
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min={1} max={1000}
+                value={filtros.quantidade}
+                onChange={e => setFiltros(prev => ({ ...prev, quantidade: parseInt(e.target.value) || 1 }))}
+                className="w-28 border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#028090]/30 focus:border-[#028090]"
+              />
+              <span className="text-sm text-[#64748B]">leads</span>
+            </div>
+          </div>
+
+          {/* Ordenação */}
+          <div>
+            <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">
+              Ordenar por
+            </label>
+            <div className="space-y-2">
+              {[
+                { value: 'menor_pct',          label: 'Menor % da renda (mais acessível primeiro)' },
+                { value: 'maior_renda',         label: 'Maior renda estimada' },
+                { value: 'faixa_intermediaria', label: 'Faixa etária intermediária (29–43 primeiro)' },
+              ].map(opt => (
+                <label key={opt.value} className="flex items-center gap-2 cursor-pointer text-sm text-[#0A1628]">
+                  <input
+                    type="radio"
+                    name="ordenar"
+                    value={opt.value}
+                    checked={filtros.ordenarPor === opt.value}
+                    onChange={() => setFiltros(prev => ({ ...prev, ordenarPor: opt.value as any }))}
+                    className="accent-[#028090]"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className={`rounded-xl p-4 border ${
+            candidatos.length === 0
+              ? 'bg-[#FEF2F2] border-[#FECACA]'
+              : 'bg-[#F0FDFA] border-[#A7F3D0]'
+          }`}>
+            <p className="text-sm font-semibold" style={{ color: candidatos.length === 0 ? '#991B1B' : '#065F46' }}>
+              {candidatos.length === 0
+                ? '⚠ Nenhum lead encontrado com estes critérios'
+                : `✓ ${candidatos.length} leads encontrados com estes critérios`}
+            </p>
+            {candidatos.length > 0 && (
+              <p className="text-xs mt-1" style={{ color: '#065F46' }}>
+                {temMenosQueDesejado
+                  ? `Menos que o solicitado — serão selecionados ${candidatos.length} leads`
+                  : `Serão selecionados os ${filtros.quantidade} primeiros`}
+              </p>
+            )}
+          </div>
+
+          {/* Aviso de poucos leads */}
+          {temMenosQueDesejado && candidatos.length > 0 && confirmarMenos && (
+            <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl p-4">
+              <p className="text-sm font-semibold text-[#92400E] mb-1">⚠ Menos leads que o solicitado</p>
+              <p className="text-xs text-[#92400E]">
+                Encontramos apenas {candidatos.length} leads com estes critérios.
+                Você pode afrouxar os filtros ou confirmar com {candidatos.length} leads.
+              </p>
+              <button
+                onClick={() => setConfirmarMenos(false)}
+                className="mt-2 text-xs text-[#92400E] underline hover:no-underline"
+              >
+                Ajustar filtros
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-[#E2E8F0] flex justify-between gap-3">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#64748B] hover:bg-[#F8FAFC] transition-colors disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving || candidatos.length === 0}
+            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-[#028090] text-white text-sm font-medium hover:bg-[#026d7a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Target size={14} />
+            {saving
+              ? 'Movendo...'
+              : temMenosQueDesejado && confirmarMenos
+              ? `✓ Confirmar com ${candidatos.length} leads`
+              : `✓ Mover para Kanban — ${Math.min(filtros.quantidade, candidatos.length)} leads`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function CampanhaDetailClient({ campanha: initial, leads }: {
+export default function CampanhaDetailClient({ campanha: initial, leads: initialLeads }: {
   campanha: Campanha
   leads: Lead[]
 }) {
+  const router = useRouter()
   const [campanha, setCampanha] = useState(initial)
+  const [leads, setLeads] = useState(initialLeads)
   const [actioning, setActioning] = useState(false)
+  const [showSelecao, setShowSelecao] = useState(false)
+  const [transferindo, setTransferindo] = useState(false)
 
   const pct = campanha.percentual_conversao ?? 0
   const leadsConv = Math.round(campanha.total_leads * (pct / 100))
@@ -347,14 +612,14 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
   const pctMas = leads.length > 0 ? (masculino / leads.length) * 100 : 0
 
   const planInfos = [
-    { label: 'Operadora',        value: campanha.operadora },
-    { label: 'Acomodação',       value: campanha.acomodacao },
-    { label: 'Coparticipação',   value: campanha.coparticipacao },
-    { label: 'Abrangência',      value: campanha.abrangencia },
-    { label: 'Município',        value: campanha.municipio },
-    { label: 'Rede referenciada',value: campanha.rede_referenciada },
-    { label: 'Canais',           value: (campanha.canal ?? []).map(c => CANAL_LABEL[c] ?? c).join(', ') },
-    { label: 'Horário',          value: campanha.horario_tipo ? campanha.horario_tipo.replace(/_/g, ' ') : null },
+    { label: 'Operadora',         value: campanha.operadora },
+    { label: 'Acomodação',        value: campanha.acomodacao },
+    { label: 'Coparticipação',    value: campanha.coparticipacao },
+    { label: 'Abrangência',       value: campanha.abrangencia },
+    { label: 'Município',         value: campanha.municipio },
+    { label: 'Rede referenciada', value: campanha.rede_referenciada },
+    { label: 'Canais',            value: (campanha.canal ?? []).map(c => CANAL_LABEL[c] ?? c).join(', ') },
+    { label: 'Horário',           value: campanha.horario_tipo ? campanha.horario_tipo.replace(/_/g, ' ') : null },
   ]
 
   const executeStatusAction = async (action: 'pausar' | 'ativar' | 'encerrar' | 'champion') => {
@@ -375,6 +640,50 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
       toast.error('Erro ao atualizar status.')
     } finally {
       setActioning(false)
+    }
+  }
+
+  const handleSelecaoConfirm = async (selected: Lead[]) => {
+    if (selected.length === 0) return
+    setTransferindo(true)
+    setShowSelecao(false)
+    const supabase = createClient()
+    try {
+      const ids = selected.map(l => l.id)
+      const now = new Date().toISOString()
+
+      // 1. UPDATE leads para 'transferido'
+      const { error: upErr } = await supabase
+        .from('leads')
+        .update({ status: 'transferido' })
+        .in('id', ids)
+      if (upErr) throw upErr
+
+      // 2. INSERT transferencias em batches de 100
+      const BATCH = 100
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const batch = ids.slice(i, i + BATCH).map(lead_id => ({
+          lead_id,
+          transferido_em: now,
+          status_parceiro: 'recebido',
+          notas_parceiro: 'selecao_inteligente',
+        }))
+        const { error: tErr } = await supabase.from('transferencias').insert(batch)
+        if (tErr) throw tErr
+      }
+
+      // 3. Atualiza estado local (marca como transferido)
+      setLeads(prev => prev.map(l =>
+        ids.includes(l.id) ? { ...l, status: 'transferido' } : l
+      ))
+
+      toast.success(`${selected.length} leads movidos para o Kanban com sucesso!`)
+      router.push('/kanban')
+    } catch (err: any) {
+      console.error(err)
+      toast.error(`Erro ao transferir leads: ${err?.message ?? 'tente novamente'}`)
+    } finally {
+      setTransferindo(false)
     }
   }
 
@@ -399,6 +708,15 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
             )}
           </div>
           <div className="flex gap-2 flex-wrap">
+            {/* Seleção Inteligente */}
+            <button
+              onClick={() => setShowSelecao(true)}
+              disabled={actioning || transferindo}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0A1628] text-white text-xs font-medium hover:bg-[#1a2d4a] transition-colors disabled:opacity-50"
+            >
+              🎯 Selecionar Propensos
+            </button>
+
             {campanha.status !== 'champion' && !campanha.is_champion && (
               <button onClick={() => executeStatusAction('champion')} disabled={actioning}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#FDE68A] bg-[#FEF9C3] text-[#92400E] text-xs font-medium hover:bg-[#FEF3C7] transition-colors disabled:opacity-50">
@@ -425,6 +743,12 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
             )}
           </div>
         </div>
+        {transferindo && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-[#028090]">
+            <div className="w-4 h-4 border-2 border-[#028090] border-t-transparent rounded-full animate-spin" />
+            Transferindo leads para o Kanban...
+          </div>
+        )}
       </div>
 
       {/* BLOCO A — Potencial Total */}
@@ -444,7 +768,6 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
         </div>
       </SectionBlock>
 
-      {/* Divider */}
       <hr className="border-[#E2E8F0]" />
 
       {/* BLOCO B — Visão Comercial */}
@@ -465,12 +788,10 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
         </div>
       </SectionBlock>
 
-      {/* Divider */}
       <hr className="border-[#E2E8F0]" />
 
       {/* Plan Info + Distributions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Plan Info */}
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 space-y-4">
           <p className="text-xs font-semibold text-[#028090] uppercase tracking-wide">Informações do plano</p>
           {planInfos.map(({ label, value }) => (
@@ -485,9 +806,7 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
           </div>
         </div>
 
-        {/* Distributions */}
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Gênero */}
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <p className="text-xs font-semibold text-[#028090] uppercase tracking-wide mb-4">Distribuição por gênero</p>
             {leads.length > 0 ? (
@@ -498,13 +817,11 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
             ) : <p className="text-xs text-[#94A3B8]">Sem dados de gênero.</p>}
           </div>
 
-          {/* Idade (Correção 2) */}
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <p className="text-xs font-semibold text-[#028090] uppercase tracking-wide mb-4">Distribuição por faixa etária</p>
             <AgesDist leads={leads} />
           </div>
 
-          {/* Status dos leads */}
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 sm:col-span-2">
             <p className="text-xs font-semibold text-[#028090] uppercase tracking-wide mb-4">Status dos leads</p>
             <LeadsDist leads={leads} />
@@ -520,6 +837,15 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
         </div>
         <LeadsTable leads={leads} />
       </div>
+
+      {/* Modal Seleção Inteligente */}
+      {showSelecao && (
+        <SelecaoModal
+          leads={leads}
+          onClose={() => setShowSelecao(false)}
+          onConfirm={handleSelecaoConfirm}
+        />
+      )}
     </div>
   )
 }
