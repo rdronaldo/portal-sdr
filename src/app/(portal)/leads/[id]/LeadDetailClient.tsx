@@ -31,6 +31,16 @@ type Lead = {
   status: string
   criado_em: string
   data_nascimento?: string | null
+  // Campanha fields
+  campanha_id?: string | null
+  renda_estimada?: number | null
+  valor_plano_total?: number | null
+  valor_plano_vida1?: number | null
+  valor_plano_vida2?: number | null
+  valor_plano_vida3?: number | null
+  percentual_renda?: number | null
+  vida2_data_nascimento?: string | null
+  vida3_data_nascimento?: string | null
 }
 
 type Qualificacao = {
@@ -170,6 +180,129 @@ function ConfirmModal({
             {saving ? 'Salvando...' : 'Confirmar'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmtCurrency(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+}
+
+function calcIdadeStr(dob: string | null | undefined): number | null {
+  if (!dob) return null
+  const parts = dob.split('-')
+  if (parts.length < 3) return null
+  const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - d.getFullYear()
+  const m = hoje.getMonth() - d.getMonth()
+  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--
+  return idade
+}
+
+// ─── Argumento Comercial (Melhoria 4) ─────────────────────────────────────────
+
+function ArgumentoComercial({ lead }: { lead: Lead }) {
+  const renda = lead.renda_estimada ?? 0
+  const totalPlano = lead.valor_plano_total ?? 0
+  const pct = lead.percentual_renda
+
+  // Não exibir se dados incompletos
+  if (!lead.campanha_id || !renda || !totalPlano) return null
+
+  const v1 = lead.valor_plano_vida1 ?? 0
+  const v2 = lead.valor_plano_vida2 ?? 0
+  const v3 = lead.valor_plano_vida3 ?? 0
+  const idade1 = calcIdadeStr(lead.data_nascimento)
+  const idade2 = calcIdadeStr(lead.vida2_data_nascimento)
+  const idade3 = calcIdadeStr(lead.vida3_data_nascimento)
+
+  const pctNum = pct ?? ((totalPlano / renda) * 100)
+  const pctStr = pctNum.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+  let destaque: { bg: string; text: string; icon: string; fala: string }
+  if (pctNum <= 10) {
+    destaque = {
+      bg: '#ECFDF5', text: '#065F46', icon: '✓',
+      fala: `"Por apenas ${pctStr}% do seu faturamento mensal, você tem um plano de saúde completo. É acessível, vantajoso e protege quem você mais precisa."`,
+    }
+  } else if (pctNum <= 20) {
+    destaque = {
+      bg: '#FFFBEB', text: '#92400E', icon: '⚠',
+      fala: `"Investindo ${pctStr}% do faturamento mensal, você garante saúde para você e sua família. É um investimento que vale cada centavo."`,
+    }
+  } else {
+    destaque = {
+      bg: '#FEF2F2', text: '#991B1B', icon: '⚠',
+      fala: `"Proteger a saúde da família com ${pctStr}% do faturamento é uma decisão que não se arrepende. Saúde é o maior patrimônio."`,
+    }
+  }
+
+  const vidas = [
+    v1 > 0 ? { label: `Vida 1${idade1 ? ` (${idade1} anos — responsável)` : ' (responsável)'}`, valor: v1 } : null,
+    v2 > 0 ? { label: `Vida 2${idade2 ? ` (${idade2} anos)` : ''}`, valor: v2 } : null,
+    v3 > 0 ? { label: `Vida 3${idade3 ? ` (${idade3} anos)` : ''}`, valor: v3 } : null,
+  ].filter(Boolean) as { label: string; valor: number }[]
+
+  return (
+    <div
+      className="rounded-xl shadow-sm p-5 space-y-4"
+      style={{
+        backgroundColor: '#F8FAFC',
+        border: '1px solid #E2E8F0',
+        borderLeft: '4px solid #028090',
+      }}
+    >
+      <p className="text-xs font-bold text-[#028090] uppercase tracking-wide flex items-center gap-1">
+        💡 Argumento Comercial
+      </p>
+
+      {/* Renda e custo */}
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs text-[#94A3B8] mb-0.5">Renda estimada</p>
+          <p className="font-semibold text-[#0A1628]">{fmtCurrency(renda)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-[#94A3B8] mb-0.5">Custo do plano</p>
+          <p className="font-semibold text-[#0A1628]">{fmtCurrency(totalPlano)} / mês</p>
+        </div>
+      </div>
+
+      {/* % da renda highlight */}
+      <div
+        className="rounded-lg px-4 py-3 flex items-center gap-2"
+        style={{ backgroundColor: destaque.bg }}
+      >
+        <span className="text-base">{destaque.icon}</span>
+        <p className="text-sm font-semibold" style={{ color: destaque.text }}>
+          Este plano representa {pctStr}% da renda mensal deste MEI
+        </p>
+      </div>
+
+      {/* Breakdown */}
+      {vidas.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-[#64748B] mb-2">Breakdown do plano:</p>
+          <div className="space-y-1">
+            {vidas.map((v, i) => (
+              <p key={i} className="text-xs text-[#0A1628]">
+                • {v.label}: <span className="font-medium">{fmtCurrency(v.valor)}</span>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sugestão de fala */}
+      <div>
+        <p className="text-xs font-semibold text-[#64748B] mb-1.5">Sugestão de fala:</p>
+        <p className="text-xs text-[#0A1628] italic leading-relaxed" style={{ color: destaque.text }}>
+          {destaque.fala}
+        </p>
       </div>
     </div>
   )
@@ -676,7 +809,7 @@ export default function LeadDetailClient({
       {/* Two-column layout */}
       <div className="flex flex-col lg:flex-row gap-6 mb-6">
         {/* Left 40% */}
-        <div className="lg:w-[40%]">
+        <div className="lg:w-[40%] space-y-4">
           <LeadInfo
             lead={lead}
             transferencia={trans}
@@ -684,6 +817,7 @@ export default function LeadDetailClient({
             now={now}
             onContact={() => setModal(true)}
           />
+          <ArgumentoComercial lead={lead} />
         </div>
 
         {/* Right 60% */}

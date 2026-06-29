@@ -26,7 +26,7 @@ export default async function CampanhaDetailPage(props: any) {
       .single(),
     supabase
       .from('leads')
-      .select('id, nome, sexo, data_nascimento, valor_plano_total, comissao_entrada, comissao_recorrente, status, criado_em')
+      .select('id, nome, sexo, data_nascimento, valor_plano_total, comissao_entrada, comissao_recorrente, percentual_renda, renda_estimada, status, criado_em')
       .eq('campanha_id', id)
       .order('valor_plano_total', { ascending: false }),
   ])

@@ -41,6 +41,9 @@ type LeadRow = {
   estado: string | null
   status: string
   criado_em: string
+  percentual_renda: number | null
+  renda_estimada: number | null
+  valor_plano_total: number | null
   transferencias: TransferenciaData[] | null
   qualificacoes: QualificacaoData[] | null
 }
@@ -515,6 +518,7 @@ export default function LeadsClient({
                   <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Cidade/Estado</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Temperatura</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] max-w-[200px]">Resumo da IA</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Renda vs Plano</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Aguardando/Contatado</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">Status</th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] text-right whitespace-nowrap">Ações</th>
@@ -570,6 +574,25 @@ export default function LeadsClient({
                         <p className="text-xs text-[#64748B] truncate" title={qual?.resumo_ia ?? ''}>
                           {qual?.resumo_ia || '—'}
                         </p>
+                      </td>
+
+                      {/* Renda vs Plano */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {lead.percentual_renda != null && lead.renda_estimada ? (() => {
+                          const p = lead.percentual_renda!
+                          const { bg, text } = p <= 10
+                            ? { bg: '#ECFDF5', text: '#065F46' }
+                            : p <= 20
+                            ? { bg: '#FFFBEB', text: '#92400E' }
+                            : { bg: '#FEF2F2', text: '#991B1B' }
+                          const pStr = p.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+                          return (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                              style={{ backgroundColor: bg, color: text }}>
+                              {pStr}%
+                            </span>
+                          )
+                        })() : <span className="text-[#94A3B8] text-xs">—</span>}
                       </td>
 
                       {/* Aguardando/Contatado */}

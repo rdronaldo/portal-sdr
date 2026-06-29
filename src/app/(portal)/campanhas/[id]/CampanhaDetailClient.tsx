@@ -34,10 +34,6 @@ type Campanha = {
   comissao_entrada_potencial: number
   comissao_recorrente_potencial: number
   percentual_conversao_real: number | null
-  preco_0_18: number; preco_19_23: number; preco_24_28: number
-  preco_29_33: number; preco_34_38: number; preco_39_43: number
-  preco_44_48: number; preco_49_53: number; preco_54_58: number
-  preco_59_mais: number
   criado_em: string
 }
 
@@ -49,6 +45,8 @@ type Lead = {
   valor_plano_total: number
   comissao_entrada: number
   comissao_recorrente: number
+  percentual_renda: number | null
+  renda_estimada: number | null
   status: string
   criado_em: string
 }
@@ -86,14 +84,32 @@ function fmt(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 }
 
+function fmtPct(v: number | null): string {
+  if (v === null || v === undefined) return '—'
+  return v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
+}
+
 function calcIdade(dob: string | null): number | null {
   if (!dob) return null
-  const d = new Date(dob)
+  // Parse date parts manually to avoid UTC vs local timezone issues
+  const parts = dob.split('-')
+  if (parts.length < 3) return null
+  const ano = parseInt(parts[0], 10)
+  const mes = parseInt(parts[1], 10) - 1
+  const dia = parseInt(parts[2], 10)
+  const d = new Date(ano, mes, dia)
   const hoje = new Date()
   let idade = hoje.getFullYear() - d.getFullYear()
   const m = hoje.getMonth() - d.getMonth()
   if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--
   return idade
+}
+
+function rendaColor(pct: number | null): { bg: string; text: string } {
+  if (pct === null) return { bg: 'transparent', text: '#94A3B8' }
+  if (pct <= 10) return { bg: '#ECFDF5', text: '#065F46' }
+  if (pct <= 20) return { bg: '#FFFBEB', text: '#92400E' }
+  return { bg: '#FEF2F2', text: '#991B1B' }
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -123,6 +139,22 @@ function MetricCard({ label, value, sub, color, icon: Icon }: {
       </div>
       <p className="text-2xl font-bold" style={{ color: '#0A1628' }}>{value}</p>
       {sub && <p className="text-xs text-[#94A3B8]">{sub}</p>}
+    </div>
+  )
+}
+
+// ─── Section Block ────────────────────────────────────────────────────────────
+
+function SectionBlock({ title, subtitle, children }: {
+  title: string; subtitle: string; children: React.ReactNode
+}) {
+  return (
+    <div>
+      <div className="mb-3">
+        <h2 className="text-sm font-bold text-[#0A1628]">{title}</h2>
+        <p className="text-xs text-[#94A3B8] mt-0.5">{subtitle}</p>
+      </div>
+      {children}
     </div>
   )
 }
@@ -163,33 +195,40 @@ function LeadsDist({ leads }: { leads: Lead[] }) {
   )
 }
 
-// ─── Age Distribution ─────────────────────────────────────────────────────────
+// ─── Age Distribution (Correção 2) ────────────────────────────────────────────
 
 function AgesDist({ leads }: { leads: Lead[] }) {
   const total = leads.length
   if (total === 0) return null
   const faixas = [
-    { label: '0-18',  min: 0,  max: 18 },
-    { label: '19-28', min: 19, max: 28 },
-    { label: '29-38', min: 29, max: 38 },
-    { label: '39-48', min: 39, max: 48 },
-    { label: '49-58', min: 49, max: 58 },
-    { label: '59+',   min: 59, max: 999 },
+    { label: '0–18',  test: (a: number) => a <= 18 },
+    { label: '19–28', test: (a: number) => a >= 19 && a <= 28 },
+    { label: '29–38', test: (a: number) => a >= 29 && a <= 38 },
+    { label: '39–48', test: (a: number) => a >= 39 && a <= 48 },
+    { label: '49–58', test: (a: number) => a >= 49 && a <= 58 },
+    { label: '59+',   test: (a: number) => a >= 59 },
   ]
   return (
     <div className="space-y-2">
       {faixas.map(f => {
         const count = leads.filter(l => {
           const age = calcIdade(l.data_nascimento)
-          return age !== null && age >= f.min && age <= f.max
+          return age !== null && f.test(age)
         }).length
-        return <DistBar key={f.label} label={f.label} pct={total > 0 ? (count / total) * 100 : 0} color="#028090" />
+        return (
+          <DistBar
+            key={f.label}
+            label={`${f.label} (${count})`}
+            pct={total > 0 ? (count / total) * 100 : 0}
+            color="#028090"
+          />
+        )
       })}
     </div>
   )
 }
 
-// ─── Leads Table ──────────────────────────────────────────────────────────────
+// ─── Leads Table (Correção 3) ─────────────────────────────────────────────────
 
 const PAGE_SIZE = 20
 
@@ -209,7 +248,7 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#F4F8FB] border-b border-[#E2E8F0]">
-              {['Nome', 'Sexo', 'Idade', 'Valor plano', 'Com. entrada', 'Rec./mês', 'Status'].map(h => (
+              {['Nome', 'Sexo', 'Idade', 'Valor plano', '% da Renda', 'Com. entrada', 'Rec./mês', 'Status'].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#64748B] whitespace-nowrap">
                   {h}
                 </th>
@@ -220,6 +259,13 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
             {slice.map(l => {
               const cfg = LEAD_STATUS[l.status] ?? { label: l.status, bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1' }
               const age = calcIdade(l.data_nascimento)
+              const pct = l.percentual_renda
+              const rColor = rendaColor(pct)
+              const hasRenda = l.renda_estimada != null && l.renda_estimada > 0
+              const tooltipText = hasRenda && pct != null
+                ? `Renda estimada: ${fmt(l.renda_estimada!)} | Plano: ${fmt(l.valor_plano_total)} | ${fmtPct(pct)} comprometido`
+                : undefined
+
               return (
                 <tr key={l.id} className="border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors">
                   <td className="px-4 py-2.5">
@@ -230,6 +276,21 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
                   <td className="px-4 py-2.5 text-[#64748B]">{l.sexo || '—'}</td>
                   <td className="px-4 py-2.5 text-[#0A1628]">{age !== null ? `${age}a` : '—'}</td>
                   <td className="px-4 py-2.5 font-medium text-[#0A1628]">{fmt(l.valor_plano_total)}</td>
+
+                  {/* % da Renda */}
+                  <td className="px-4 py-2.5" title={tooltipText}>
+                    {hasRenda && pct != null ? (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs font-semibold cursor-help"
+                        style={{ backgroundColor: rColor.bg, color: rColor.text }}
+                      >
+                        {fmtPct(pct)}
+                      </span>
+                    ) : (
+                      <span className="text-[#94A3B8] text-xs">—</span>
+                    )}
+                  </td>
+
                   <td className="px-4 py-2.5 text-[#028090]">{fmt(l.comissao_entrada)}</td>
                   <td className="px-4 py-2.5 text-[#02C39A]">{fmt(l.comissao_recorrente)}</td>
                   <td className="px-4 py-2.5">
@@ -244,25 +305,18 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-[#E2E8F0]">
           <span className="text-xs text-[#64748B]">
             {(page - 1) * PAGE_SIZE + 1} a {Math.min(page * PAGE_SIZE, total)} de {total} leads
           </span>
           <div className="flex gap-1">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] transition-colors disabled:opacity-40"
-            >
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] transition-colors disabled:opacity-40">
               <ChevronLeft size={14} />
             </button>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] transition-colors disabled:opacity-40"
-            >
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F4F8FB] transition-colors disabled:opacity-40">
               <ChevronRight size={14} />
             </button>
           </div>
@@ -278,17 +332,16 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
   campanha: Campanha
   leads: Lead[]
 }) {
-  const router = useRouter()
   const [campanha, setCampanha] = useState(initial)
   const [actioning, setActioning] = useState(false)
 
   const pct = campanha.percentual_conversao ?? 0
   const leadsConv = Math.round(campanha.total_leads * (pct / 100))
-  const valorConv = campanha.valor_total_potencial * (pct / 100)
-  const comEntradaConv = campanha.comissao_entrada_potencial * (pct / 100)
-  const comRecConv = campanha.comissao_recorrente_potencial * (pct / 100)
+  const mensalidadesEsperadas = campanha.valor_total_potencial * (pct / 100)
+  const comEntradaEsperada = mensalidadesEsperadas * 1.5
+  const recorrenteEsperada = mensalidadesEsperadas * 0.02
 
-  const feminino = leads.filter(l => ['F', 'Feminino', 'FEMININO'].includes(l.sexo ?? '')).length
+  const feminino = leads.filter(l => ['F', 'Feminino', 'FEMININO', 'feminino'].includes(l.sexo ?? '')).length
   const masculino = leads.length - feminino
   const pctFem = leads.length > 0 ? (feminino / leads.length) * 100 : 0
   const pctMas = leads.length > 0 ? (masculino / leads.length) * 100 : 0
@@ -301,7 +354,7 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
     { label: 'Município',        value: campanha.municipio },
     { label: 'Rede referenciada',value: campanha.rede_referenciada },
     { label: 'Canais',           value: (campanha.canal ?? []).map(c => CANAL_LABEL[c] ?? c).join(', ') },
-    { label: 'Horário',          value: campanha.horario_tipo ? campanha.horario_tipo.replace('_', ' ') : null },
+    { label: 'Horário',          value: campanha.horario_tipo ? campanha.horario_tipo.replace(/_/g, ' ') : null },
   ]
 
   const executeStatusAction = async (action: 'pausar' | 'ativar' | 'encerrar' | 'champion') => {
@@ -347,38 +400,26 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
           </div>
           <div className="flex gap-2 flex-wrap">
             {campanha.status !== 'champion' && !campanha.is_champion && (
-              <button
-                onClick={() => executeStatusAction('champion')}
-                disabled={actioning}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#FDE68A] bg-[#FEF9C3] text-[#92400E] text-xs font-medium hover:bg-[#FEF3C7] transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => executeStatusAction('champion')} disabled={actioning}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#FDE68A] bg-[#FEF9C3] text-[#92400E] text-xs font-medium hover:bg-[#FEF3C7] transition-colors disabled:opacity-50">
                 <Star size={13} /> Champion
               </button>
             )}
             {campanha.status === 'ativa' && (
-              <button
-                onClick={() => executeStatusAction('pausar')}
-                disabled={actioning}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => executeStatusAction('pausar')} disabled={actioning}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] transition-colors disabled:opacity-50">
                 <Pause size={13} /> Pausar
               </button>
             )}
             {(campanha.status === 'pausada' || campanha.status === 'rascunho') && (
-              <button
-                onClick={() => executeStatusAction('ativar')}
-                disabled={actioning}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#028090] text-white text-xs font-medium hover:bg-[#026d7a] transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => executeStatusAction('ativar')} disabled={actioning}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#028090] text-white text-xs font-medium hover:bg-[#026d7a] transition-colors disabled:opacity-50">
                 <Play size={13} /> Ativar
               </button>
             )}
             {campanha.status !== 'encerrada' && (
-              <button
-                onClick={() => executeStatusAction('encerrar')}
-                disabled={actioning}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#FECACA] bg-[#FEF2F2] text-[#991B1B] text-xs font-medium hover:bg-[#FEE2E2] transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => executeStatusAction('encerrar')} disabled={actioning}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#FECACA] bg-[#FEF2F2] text-[#991B1B] text-xs font-medium hover:bg-[#FEE2E2] transition-colors disabled:opacity-50">
                 <XCircle size={13} /> Encerrar
               </button>
             )}
@@ -386,31 +427,48 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
         </div>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Total de leads" value={campanha.total_leads.toLocaleString('pt-BR')}
-          sub={`${pct}% conversão estimada`}
-          color="#028090" icon={Users}
-        />
-        <MetricCard
-          label="Potencial (mensalidades)" value={fmt(campanha.valor_total_potencial)}
-          sub={`≈ ${fmt(valorConv)} com ${pct}% conv.`}
-          color="#028090" icon={DollarSign}
-        />
-        <MetricCard
-          label="Com. entrada (1,5x)" value={fmt(campanha.comissao_entrada_potencial)}
-          sub={`≈ ${fmt(comEntradaConv)} esperado`}
-          color="#02C39A" icon={TrendingUp}
-        />
-        <MetricCard
-          label="Recorrente / mês (2%)" value={fmt(campanha.comissao_recorrente_potencial)}
-          sub={`≈ ${fmt(comRecConv)} esperado`}
-          color="#02C39A" icon={Repeat}
-        />
-      </div>
+      {/* BLOCO A — Potencial Total */}
+      <SectionBlock
+        title="Potencial Total (100% da base)"
+        subtitle="Se 100% dos leads converterem"
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard label="Total de leads" value={campanha.total_leads.toLocaleString('pt-BR')}
+            color="#028090" icon={Users} />
+          <MetricCard label="Mensalidades totais" value={fmt(campanha.valor_total_potencial)}
+            color="#028090" icon={DollarSign} />
+          <MetricCard label="Comissão de entrada (1,5x)" value={fmt(campanha.comissao_entrada_potencial)}
+            color="#02C39A" icon={TrendingUp} />
+          <MetricCard label="Recorrente mensal (2%)" value={fmt(campanha.comissao_recorrente_potencial)}
+            color="#02C39A" icon={Repeat} />
+        </div>
+      </SectionBlock>
 
-      {/* Two-column: Plan Info + Distributions */}
+      {/* Divider */}
+      <hr className="border-[#E2E8F0]" />
+
+      {/* BLOCO B — Visão Comercial */}
+      <SectionBlock
+        title="Visão Comercial (conversão estimada)"
+        subtitle={`Baseado em ${pct}% de conversão estimada`}
+      >
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard label="Leads estimados" value={leadsConv.toLocaleString('pt-BR')}
+            sub={`${pct}% de ${campanha.total_leads.toLocaleString('pt-BR')} leads`}
+            color="#F59E0B" icon={Users} />
+          <MetricCard label="Mensalidades esperadas" value={fmt(mensalidadesEsperadas)}
+            color="#F59E0B" icon={DollarSign} />
+          <MetricCard label="Comissão entrada esperada" value={fmt(comEntradaEsperada)}
+            color="#028090" icon={TrendingUp} />
+          <MetricCard label="Recorrente esperada/mês" value={fmt(recorrenteEsperada)}
+            color="#028090" icon={Repeat} />
+        </div>
+      </SectionBlock>
+
+      {/* Divider */}
+      <hr className="border-[#E2E8F0]" />
+
+      {/* Plan Info + Distributions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Plan Info */}
         <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 space-y-4">
@@ -440,7 +498,7 @@ export default function CampanhaDetailClient({ campanha: initial, leads }: {
             ) : <p className="text-xs text-[#94A3B8]">Sem dados de gênero.</p>}
           </div>
 
-          {/* Idade */}
+          {/* Idade (Correção 2) */}
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <p className="text-xs font-semibold text-[#028090] uppercase tracking-wide mb-4">Distribuição por faixa etária</p>
             <AgesDist leads={leads} />

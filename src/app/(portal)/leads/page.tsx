@@ -80,7 +80,7 @@ export default async function LeadsPage(props: any) {
   let query: any = supabase
     .from('leads')
     .select(
-      `id, nome, telefone, cidade, estado, status, criado_em,
+      `id, nome, telefone, cidade, estado, status, criado_em, percentual_renda, renda_estimada, valor_plano_total,
        transferencias(id, transferido_em, primeiro_contato_em, status_parceiro),
        qualificacoes(temperatura, resumo_ia)`,
       { count: 'exact' }

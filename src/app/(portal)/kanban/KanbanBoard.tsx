@@ -27,6 +27,8 @@ type TransferenciaComLead = {
     nome: string | null
     telefone: string
     criado_em: string
+    percentual_renda: number | null
+    renda_estimada: number | null
   } | null
 }
 
@@ -65,6 +67,18 @@ function LeadCard({ item }: { item: TransferenciaComLead }) {
       <p className="text-xs text-[#94A3B8] mt-1.5">
         {new Date(item.transferido_em).toLocaleDateString('pt-BR')}
       </p>
+      {item.leads?.percentual_renda != null && item.leads?.renda_estimada ? (() => {
+        const p = item.leads.percentual_renda!
+        const color = p <= 10 ? '#065F46' : p <= 20 ? '#92400E' : '#991B1B'
+        const bg    = p <= 10 ? '#ECFDF5' : p <= 20 ? '#FFFBEB' : '#FEF2F2'
+        const pStr  = p.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+        return (
+          <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: bg, color }}>
+            💰 {pStr}% da renda
+          </span>
+        )
+      })() : null}
     </div>
   )
 }

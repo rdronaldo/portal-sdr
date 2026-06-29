@@ -6,7 +6,7 @@ export default async function KanbanPage() {
 
   const { data: transferencias } = await supabase
     .from('transferencias')
-    .select('*, leads(nome, telefone, criado_em)')
+    .select('*, leads(nome, telefone, criado_em, percentual_renda, renda_estimada)')
     .order('transferido_em', { ascending: false })
 
   return <KanbanBoard initialData={transferencias ?? []} />
