@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ArrowLeft, Star, Pause, Play, XCircle, Users, TrendingUp,
   DollarSign, Repeat, ChevronLeft, ChevronRight, Target, Download,
+  Plus, Trash2, FileText, Music, Video, Image, ExternalLink,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -48,6 +49,20 @@ type Lead = {
   percentual_renda: number | null
   renda_estimada: number | null
   status: string
+  criado_em: string
+}
+
+type Material = {
+  id: string
+  campanha_id: string
+  tipo: 'texto' | 'audio' | 'video' | 'imagem'
+  nome_arquivo: string
+  storage_path: string
+  tamanho_bytes: number
+  mime_type: string
+  conteudo_texto: string
+  percentual_uso: number
+  ativo: boolean
   criado_em: string
 }
 
@@ -368,6 +383,275 @@ function LeadsTable({ leads }: { leads: Lead[] }) {
   )
 }
 
+// ─── Materials Block ──────────────────────────────────────────────────────────
+
+function fmtBytesDetail(b: number): string {
+  if (!b) return ''
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`
+  return `${(b / 1024 / 1024).toFixed(1)} MB`
+}
+
+const TIPO_ICON: Record<string, any> = {
+  texto: FileText, audio: Music, video: Video, imagem: Image,
+}
+const TIPO_EMOJI: Record<string, string> = {
+  texto: '📝', audio: '🎵', video: '🎬', imagem: '🖼️',
+}
+
+function MaterialCard({ mat, onRemove, campanhaId }: { mat: Material; onRemove: (id: string) => void; campanhaId: string }) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
+  const [loadingUrl, setLoadingUrl] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  const getSignedUrl = async () => {
+    if (!mat.storage_path) return null
+    setLoadingUrl(true)
+    const supabase = createClient()
+    const { data } = await supabase.storage.from('campanha-materiais').createSignedUrl(mat.storage_path, 60)
+    setLoadingUrl(false)
+    return data?.signedUrl ?? null
+  }
+
+  const handleView = async () => {
+    if (mat.tipo === 'texto') { setExpanded(e => !e); return }
+    const url = await getSignedUrl()
+    if (url) { setSignedUrl(url); window.open(url, '_blank') }
+  }
+
+  const handleDownload = async () => {
+    const url = await getSignedUrl()
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url; a.download = mat.nome_arquivo; a.click()
+  }
+
+  const handleRemoveConfirmed = async () => {
+    setRemoving(true)
+    const supabase = createClient()
+    try {
+      if (mat.storage_path) {
+        await supabase.storage.from('campanha-materiais').remove([mat.storage_path])
+      }
+      const { error } = await supabase.from('materiais_campanha').delete().eq('id', mat.id)
+      if (error) throw error
+      onRemove(mat.id)
+      toast.success('Material removido.')
+    } catch {
+      toast.error('Erro ao remover material.')
+    } finally {
+      setRemoving(false)
+      setConfirmRemove(false)
+    }
+  }
+
+  const Icon = TIPO_ICON[mat.tipo] ?? FileText
+  const emoji = TIPO_EMOJI[mat.tipo] ?? '📄'
+
+  return (
+    <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-[#F0FDFA] flex items-center justify-center shrink-0">
+            <Icon size={16} style={{ color: '#028090' }} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[#0A1628] truncate">{emoji} {mat.nome_arquivo}</p>
+            <p className="text-xs text-[#94A3B8]">
+              {fmtBytesDetail(mat.tamanho_bytes)}{mat.tamanho_bytes ? ' · ' : ''}
+              {mat.percentual_uso}% uso · {new Date(mat.criado_em).toLocaleDateString('pt-BR')}
+            </p>
+          </div>
+        </div>
+        <button onClick={() => setConfirmRemove(true)} className="shrink-0 text-[#94A3B8] hover:text-[#EF4444] transition-colors">
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {/* Preview for text */}
+      {mat.tipo === 'texto' && mat.conteudo_texto && (
+        <div className="bg-[#F8FAFC] rounded-lg p-3 text-xs text-[#64748B] leading-relaxed">
+          {expanded ? mat.conteudo_texto : mat.conteudo_texto.slice(0, 120) + (mat.conteudo_texto.length > 120 ? '...' : '')}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleView}
+          disabled={loadingUrl}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#028090] text-white text-xs font-medium hover:bg-[#026d7a] transition-colors disabled:opacity-50"
+        >
+          <ExternalLink size={12} />
+          {mat.tipo === 'texto' ? (expanded ? 'Recolher' : 'Ver completo') : (loadingUrl ? 'Abrindo...' : 'Abrir')}
+        </button>
+        {mat.tipo !== 'texto' && (
+          <button
+            onClick={handleDownload}
+            disabled={loadingUrl}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors disabled:opacity-50"
+          >
+            <Download size={12} /> Baixar
+          </button>
+        )}
+      </div>
+
+      {confirmRemove && (
+        <div className="border-t border-[#FEE2E2] pt-3 bg-[#FEF2F2] rounded-b-xl -mx-4 -mb-4 px-4 pb-4">
+          <p className="text-xs font-semibold text-[#991B1B] mb-2">Remover este material permanentemente?</p>
+          <div className="flex gap-2">
+            <button onClick={() => setConfirmRemove(false)} className="flex-1 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs text-[#64748B]">Cancelar</button>
+            <button onClick={handleRemoveConfirmed} disabled={removing} className="flex-1 px-3 py-1.5 rounded-lg bg-[#EF4444] text-white text-xs font-medium disabled:opacity-50">
+              {removing ? 'Removendo...' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AddMaterialModal({ campanhaId, onClose, onAdded }: { campanhaId: string; onClose: () => void; onAdded: (m: Material) => void }) {
+  const [tipo, setTipo] = useState<'texto' | 'audio' | 'video' | 'imagem'>('texto')
+  const [conteudoTexto, setConteudoTexto] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+
+  const TIPO_OPTS = [
+    { value: 'texto', label: '📝 Texto' },
+    { value: 'audio', label: '🎵 Áudio' },
+    { value: 'video', label: '🎬 Vídeo' },
+    { value: 'imagem', label: '🖼️ Imagem' },
+  ]
+
+  const ACCEPT: Record<string, string> = {
+    audio: '.mp3,.ogg,.wav', video: '.mp4,.mov', imagem: '.jpg,.jpeg,.png,.webp',
+  }
+
+  const handleSave = async () => {
+    setUploading(true)
+    const supabase = createClient()
+    try {
+      let storagePath = ''
+      let tamanho = 0
+      let mimeType = ''
+
+      if (tipo !== 'texto' && file) {
+        const path = `${campanhaId}/${Date.now()}_${file.name}`
+        const { error } = await supabase.storage.from('campanha-materiais').upload(path, file, { upsert: true })
+        if (error) throw error
+        storagePath = path
+        tamanho = file.size
+        mimeType = file.type
+      }
+
+      const { data: mat, error: dbErr } = await supabase.from('materiais_campanha').insert({
+        campanha_id: campanhaId,
+        tipo,
+        nome_arquivo: tipo === 'texto' ? 'Texto principal' : (file?.name ?? ''),
+        storage_path: storagePath,
+        tamanho_bytes: tamanho,
+        mime_type: mimeType,
+        conteudo_texto: tipo === 'texto' ? conteudoTexto : '',
+        percentual_uso: 100,
+      }).select().single()
+
+      if (dbErr) throw dbErr
+      onAdded(mat as Material)
+      toast.success('Material adicionado!')
+      onClose()
+    } catch (err: any) {
+      toast.error(`Erro: ${err?.message ?? 'tente novamente'}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const canSave = tipo === 'texto' ? conteudoTexto.trim().length > 0 : file !== null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="px-6 py-5 border-b border-[#E2E8F0]">
+          <h2 className="text-base font-bold text-[#0A1628]">+ Adicionar Material</h2>
+        </div>
+        <div className="px-6 py-5 space-y-5">
+          <div>
+            <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">Tipo</label>
+            <div className="grid grid-cols-4 gap-2">
+              {TIPO_OPTS.map(opt => (
+                <button key={opt.value} onClick={() => { setTipo(opt.value as any); setFile(null) }}
+                  className="py-2 px-1 rounded-lg text-xs font-medium border transition-colors text-center"
+                  style={tipo === opt.value
+                    ? { borderColor: '#028090', backgroundColor: '#F0FDFA', color: '#028090' }
+                    : { borderColor: '#E2E8F0', color: '#64748B' }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {tipo === 'texto' ? (
+            <div>
+              <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">Conteúdo</label>
+              <textarea value={conteudoTexto} onChange={e => setConteudoTexto(e.target.value)} rows={5}
+                placeholder="Digite a mensagem... use {{nome}} para personalizar."
+                className="w-full border border-[#E2E8F0] rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#028090]/30 resize-none" />
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-semibold text-[#64748B] uppercase tracking-wide block mb-2">Arquivo</label>
+              <input type="file" accept={ACCEPT[tipo] ?? ''} onChange={e => setFile(e.target.files?.[0] ?? null)}
+                className="w-full border border-[#E2E8F0] rounded-lg px-3 py-2 text-sm file:mr-3 file:text-xs file:font-medium file:bg-[#028090] file:text-white file:border-0 file:rounded file:px-3 file:py-1" />
+              {file && <p className="text-xs text-[#64748B] mt-1">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-[#E2E8F0] flex justify-between gap-3">
+          <button onClick={onClose} disabled={uploading} className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#64748B] hover:bg-[#F8FAFC] disabled:opacity-50">Cancelar</button>
+          <button onClick={handleSave} disabled={!canSave || uploading}
+            className="px-5 py-2 rounded-lg bg-[#028090] text-white text-sm font-medium hover:bg-[#026d7a] disabled:opacity-40">
+            {uploading ? 'Enviando...' : 'Salvar material'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MaterialsBlock({ campanhaId, initialMateriais }: { campanhaId: string; initialMateriais: Material[] }) {
+  const [materiais, setMateriais] = useState(initialMateriais)
+  const [showAdd, setShowAdd] = useState(false)
+
+  const handleRemove = (id: string) => setMateriais(prev => prev.filter(m => m.id !== id))
+  const handleAdded = (m: Material) => setMateriais(prev => [...prev, m])
+
+  return (
+    <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+        <p className="text-sm font-semibold text-[#0A1628]">Materiais da Campanha</p>
+        <button onClick={() => setShowAdd(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#028090] text-white text-xs font-medium hover:bg-[#026d7a] transition-colors">
+          <Plus size={13} /> Adicionar Material
+        </button>
+      </div>
+      <div className="p-6">
+        {materiais.length === 0 ? (
+          <p className="text-sm text-[#94A3B8] text-center py-4">Nenhum material de conteúdo cadastrado para esta campanha.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {materiais.map(m => (
+              <MaterialCard key={m.id} mat={m} onRemove={handleRemove} campanhaId={campanhaId} />
+            ))}
+          </div>
+        )}
+      </div>
+      {showAdd && <AddMaterialModal campanhaId={campanhaId} onClose={() => setShowAdd(false)} onAdded={handleAdded} />}
+    </div>
+  )
+}
+
 // ─── Seleção Inteligente Modal ────────────────────────────────────────────────
 
 function SelecaoModal({
@@ -589,9 +873,10 @@ function SelecaoModal({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function CampanhaDetailClient({ campanha: initial, leads: initialLeads }: {
+export default function CampanhaDetailClient({ campanha: initial, leads: initialLeads, materiais: initialMateriais }: {
   campanha: Campanha
   leads: Lead[]
+  materiais: Material[]
 }) {
   const router = useRouter()
   const [campanha, setCampanha] = useState(initial)
@@ -872,6 +1157,9 @@ export default function CampanhaDetailClient({ campanha: initial, leads: initial
           </div>
         </div>
       </div>
+
+      {/* Materiais */}
+      <MaterialsBlock campanhaId={campanha.id} initialMateriais={initialMateriais} />
 
       {/* Leads Table */}
       <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">

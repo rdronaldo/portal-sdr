@@ -101,6 +101,35 @@ const emptyPrecos: Precos = {
   preco_54_58: 0, preco_59_mais: 0,
 }
 
+// ─── Material Types ───────────────────────────────────────────────────────────
+
+type MaterialItem = {
+  localId: string
+  tipo: 'texto' | 'audio' | 'video' | 'imagem'
+  nome_arquivo: string
+  storage_path: string
+  tamanho_bytes: number
+  mime_type: string
+  conteudo_texto: string
+  percentual_uso: number
+  uploading: boolean
+  error: string | null
+  previewUrl: string | null
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function redistribuirPct(items: MaterialItem[], tipo: MaterialItem['tipo']): MaterialItem[] {
+  const grupo = items.filter(m => m.tipo === tipo)
+  if (grupo.length === 0) return items
+  const pct = parseFloat((100 / grupo.length).toFixed(2))
+  return items.map(m => m.tipo === tipo ? { ...m, percentual_uso: pct } : m)
+}
+
 const initialData: WizardData = {
   codigo: '', versao: 'A', nome_descritivo: '',
   canal: [], formatos: [], horario_tipo: 'dias_uteis',
@@ -308,17 +337,199 @@ function CardToggle({ emoji, label, selected, onClick }: {
   )
 }
 
-function Step2({ data, onChange, onNext, onBack }: {
+// ─── Upload Area ──────────────────────────────────────────────────────────────
+
+function UploadArea({ tipo, accept, label, hint, items, onUpload, onRemove, onPctChange, onTextoChange }: {
+  tipo: MaterialItem['tipo']
+  accept: string
+  label: string
+  hint: string
+  items: MaterialItem[]
+  onUpload: (files: FileList) => void
+  onRemove: (localId: string) => void
+  onPctChange: (localId: string, v: number) => void
+  onTextoChange?: (texto: string) => void
+}) {
+  const [dragging, setDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  if (tipo === 'texto') {
+    const textItem = items[0]
+    return (
+      <div className="border border-[#E2E8F0] rounded-xl p-5 bg-[#F8FAFC]">
+        <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">{label}</p>
+        <textarea
+          value={textItem?.conteudo_texto || ''}
+          onChange={e => onTextoChange?.(e.target.value)}
+          rows={5}
+          placeholder="Digite a mensagem que será usada nesta campanha..."
+          className="w-full border border-[#E2E8F0] rounded-lg px-4 py-3 text-sm text-[#0A1628] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#028090]/30 focus:border-[#028090] resize-none"
+        />
+        <p className="text-xs text-[#94A3B8] mt-1.5">
+          Use <code className="bg-[#E2E8F0] px-1 rounded text-[#0A1628]">{'{{nome}}'}</code> para personalizar com o nome do lead.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border border-[#E2E8F0] rounded-xl p-5 bg-[#F8FAFC]">
+      <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">{label}</p>
+
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) onUpload(e.dataTransfer.files) }}
+        className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
+          dragging ? 'border-[#028090] bg-[#F0FDFA]' : 'border-[#CBD5E1] hover:border-[#028090]/50 hover:bg-[#F0FDFA]/50'
+        }`}
+      >
+        <Upload size={18} className="mx-auto mb-1.5 text-[#94A3B8]" />
+        <p className="text-sm font-medium text-[#0A1628]">Arraste ou clique para enviar</p>
+        <p className="text-xs text-[#94A3B8] mt-0.5">{hint}</p>
+        <input ref={inputRef} type="file" accept={accept} multiple className="hidden"
+          onChange={e => e.target.files?.length && onUpload(e.target.files)} />
+      </div>
+
+      {items.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {items.map(item => (
+            <div key={item.localId} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
+              {item.uploading && (
+                <div className="mb-2">
+                  <div className="h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-[#028090] to-[#02C39A] rounded-full animate-pulse w-3/4" />
+                  </div>
+                  <p className="text-xs text-[#94A3B8] mt-1">Enviando...</p>
+                </div>
+              )}
+              {item.error && <p className="text-xs text-red-500 mb-2">⚠ {item.error}</p>}
+              <div className="flex items-start gap-3">
+                {item.previewUrl && tipo === 'imagem' && (
+                  <img src={item.previewUrl} alt={item.nome_arquivo} className="w-14 h-14 rounded-lg object-cover border border-[#E2E8F0] shrink-0" />
+                )}
+                {item.previewUrl && tipo === 'audio' && (
+                  <audio controls src={item.previewUrl} className="h-8 flex-1" />
+                )}
+                {item.previewUrl && tipo === 'video' && (
+                  <video src={item.previewUrl} className="w-20 h-14 rounded-lg object-cover border border-[#E2E8F0] shrink-0" muted />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#0A1628] truncate">{item.nome_arquivo}</p>
+                  {item.tamanho_bytes > 0 && <p className="text-xs text-[#94A3B8]">{formatBytes(item.tamanho_bytes)}</p>}
+                  {!item.uploading && !item.error && <p className="text-xs text-[#02C39A] font-medium mt-0.5">✓ Enviado</p>}
+                </div>
+                <button onClick={() => onRemove(item.localId)} className="text-xs text-[#EF4444] hover:underline shrink-0 mt-0.5">
+                  Remover
+                </button>
+              </div>
+              {items.filter(m => m.tipo === tipo).length > 1 && !item.uploading && (
+                <div className="mt-3 flex items-center gap-2 pt-3 border-t border-[#F1F5F9]">
+                  <label className="text-xs text-[#64748B]">% de uso neste formato:</label>
+                  <input type="number" min={0} max={100} step={1}
+                    value={item.percentual_uso}
+                    onChange={e => onPctChange(item.localId, parseFloat(e.target.value) || 0)}
+                    className="w-16 border border-[#E2E8F0] rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#028090]/30"
+                  />
+                  <span className="text-xs text-[#94A3B8]">%</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Step2({ data, onChange, onNext, onBack, materiais, onMateriaisChange, tempId }: {
   data: WizardData
   onChange: (d: Partial<WizardData>) => void
   onNext: () => void
   onBack: () => void
+  materiais: MaterialItem[]
+  onMateriaisChange: (m: MaterialItem[]) => void
+  tempId: string
 }) {
   const toggleItem = (arr: string[], item: string) =>
     arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item]
 
   const nLeads = data.processedLeads.length
   const converted = Math.round(nLeads * (data.percentual_conversao / 100))
+
+  // Upload handler
+  const handleUpload = async (files: FileList, tipo: MaterialItem['tipo']) => {
+    const supabase = createClient()
+    const newItems: MaterialItem[] = Array.from(files).map(file => ({
+      localId: crypto.randomUUID(),
+      tipo,
+      nome_arquivo: file.name,
+      storage_path: '',
+      tamanho_bytes: file.size,
+      mime_type: file.type,
+      conteudo_texto: '',
+      percentual_uso: 100,
+      uploading: true,
+      error: null,
+      previewUrl: URL.createObjectURL(file),
+    }))
+    const updated = redistribuirPct([...materiais, ...newItems], tipo)
+    onMateriaisChange(updated)
+
+    // Upload each file
+    for (let i = 0; i < newItems.length; i++) {
+      const item = newItems[i]
+      const file = files[i]
+      const path = `temp/${tempId}/${Date.now()}_${file.name}`
+      const { error } = await supabase.storage.from('campanha-materiais').upload(path, file, { upsert: true })
+      onMateriaisChange(prev => {
+        const next = prev.map(m =>
+          m.localId === item.localId
+            ? { ...m, uploading: false, storage_path: error ? '' : path, error: error ? error.message : null }
+            : m
+        )
+        return next
+      })
+    }
+  }
+
+  const handleRemove = (localId: string) => {
+    const item = materiais.find(m => m.localId === localId)
+    if (!item) return
+    if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
+    const next = redistribuirPct(materiais.filter(m => m.localId !== localId), item.tipo)
+    onMateriaisChange(next)
+    // Remove do storage se já foi enviado
+    if (item.storage_path) {
+      const supabase = createClient()
+      supabase.storage.from('campanha-materiais').remove([item.storage_path]).catch(() => {})
+    }
+  }
+
+  const handleTexto = (texto: string) => {
+    const existing = materiais.find(m => m.tipo === 'texto')
+    if (existing) {
+      onMateriaisChange(materiais.map(m => m.tipo === 'texto' ? { ...m, conteudo_texto: texto } : m))
+    } else {
+      onMateriaisChange([...materiais, {
+        localId: crypto.randomUUID(), tipo: 'texto', nome_arquivo: 'Texto principal',
+        storage_path: '', tamanho_bytes: 0, mime_type: 'text/plain', conteudo_texto: texto,
+        percentual_uso: 100, uploading: false, error: null, previewUrl: null,
+      }])
+    }
+  }
+
+  const handlePctChange = (localId: string, v: number) => {
+    onMateriaisChange(materiais.map(m => m.localId === localId ? { ...m, percentual_uso: v } : m))
+  }
+
+  const FORMAT_CONFIG: Record<string, { accept: string; label: string; hint: string }> = {
+    texto:  { accept: '',                  label: '📝 Conteúdo de texto', hint: '' },
+    audio:  { accept: '.mp3,.ogg,.wav',    label: '🎵 Arquivo de áudio',  hint: 'Aceita .mp3, .ogg, .wav — Máx 50MB' },
+    video:  { accept: '.mp4,.mov',         label: '🎬 Arquivo de vídeo',  hint: 'Aceita .mp4, .mov — Máx 50MB' },
+    imagem: { accept: '.jpg,.jpeg,.png,.webp', label: '🖼️ Arquivo de imagem', hint: 'Aceita .jpg, .png, .webp — Máx 50MB' },
+  }
 
   return (
     <div className="space-y-8">
@@ -451,6 +662,34 @@ function Step2({ data, onChange, onNext, onBack }: {
           <strong className="text-[#028090]">{converted}</strong> clientes para atendimento humano.
         </div>
       </div>
+
+      {/* Upload areas por formato */}
+      {data.formatos.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Conteúdo por formato</p>
+            <p className="text-xs text-[#94A3B8]">Faça o upload dos materiais que serão usados nesta campanha</p>
+          </div>
+          {data.formatos.map(fmt => {
+            const cfg = FORMAT_CONFIG[fmt]
+            if (!cfg) return null
+            return (
+              <UploadArea
+                key={fmt}
+                tipo={fmt as MaterialItem['tipo']}
+                accept={cfg.accept}
+                label={cfg.label}
+                hint={cfg.hint}
+                items={materiais.filter(m => m.tipo === fmt)}
+                onUpload={files => handleUpload(files, fmt as MaterialItem['tipo'])}
+                onRemove={handleRemove}
+                onPctChange={handlePctChange}
+                onTextoChange={fmt === 'texto' ? handleTexto : undefined}
+              />
+            )
+          })}
+        </div>
+      )}
 
       {/* Nav */}
       <div className="flex justify-between pt-4">
@@ -858,8 +1097,6 @@ export default function NovaCampanhaPage() {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
         const parsed = JSON.parse(saved)
-        // Nunca restaurar o código — sempre gerar um novo para evitar duplicatas
-        // Não restaurar leads — muito grande para localStorage
         const { codigo, versao, processedLeads, rawRows, fileName, ...rest } = parsed
         return { ...initialData, ...rest, processedLeads: [], rawRows: [], fileName: '' }
       }
@@ -867,6 +1104,8 @@ export default function NovaCampanhaPage() {
     return initialData
   })
   const [saving, setSaving] = useState(false)
+  const [tempId] = useState(() => crypto.randomUUID())
+  const [materiais, setMateriais] = useState<MaterialItem[]>([])
 
   const update = useCallback((d: Partial<WizardData>) => {
     setData(prev => {
@@ -972,6 +1211,32 @@ export default function NovaCampanhaPage() {
         comissao_recorrente_potencial: comRec,
       }).eq('id', camp.id)
 
+      // Mover materiais de temp/ para {campanha_id}/ e inserir registros
+      const materiaisComPath = materiais.filter(m => m.tipo === 'texto' || m.storage_path)
+      if (materiaisComPath.length > 0) {
+        for (const mat of materiaisComPath) {
+          try {
+            if (mat.tipo === 'texto') {
+              if (!mat.conteudo_texto) continue
+              await supabase.from('materiais_campanha').insert({
+                campanha_id: camp.id, tipo: 'texto',
+                nome_arquivo: 'Texto principal', storage_path: '',
+                conteudo_texto: mat.conteudo_texto, percentual_uso: mat.percentual_uso,
+              })
+            } else if (mat.storage_path && !mat.error) {
+              const newPath = `${camp.id}/${mat.nome_arquivo}`
+              await supabase.storage.from('campanha-materiais').move(mat.storage_path, newPath)
+              await supabase.from('materiais_campanha').insert({
+                campanha_id: camp.id, tipo: mat.tipo,
+                nome_arquivo: mat.nome_arquivo, storage_path: newPath,
+                tamanho_bytes: mat.tamanho_bytes, mime_type: mat.mime_type,
+                percentual_uso: mat.percentual_uso,
+              })
+            }
+          } catch { /* não bloqueia o salvamento da campanha */ }
+        }
+      }
+
       toast.success('Campanha salva com sucesso!')
       try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(STORAGE_KEY + '_step') } catch {}
       router.push(`/campanhas/${camp.id}`)
@@ -994,7 +1259,7 @@ export default function NovaCampanhaPage() {
         <StepBar current={step} />
 
         {step === 0 && <Step1 data={data} onChange={update} onNext={() => setStepPersisted(1)} onCancel={() => router.push('/campanhas')} />}
-        {step === 1 && <Step2 data={data} onChange={update} onNext={() => setStepPersisted(2)} onBack={() => setStepPersisted(0)} />}
+        {step === 1 && <Step2 data={data} onChange={update} onNext={() => setStepPersisted(2)} onBack={() => setStepPersisted(0)} materiais={materiais} onMateriaisChange={setMateriais} tempId={tempId} />}
         {step === 2 && <Step3 data={data} onChange={update} onNext={() => setStepPersisted(3)} onBack={() => setStepPersisted(1)} />}
         {step === 3 && <Step4 data={data} onChange={update} onBack={() => setStepPersisted(2)} onSave={saveCampanha} saving={saving} />}
       </div>

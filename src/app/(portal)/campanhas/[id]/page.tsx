@@ -18,7 +18,7 @@ export default async function CampanhaDetailPage(props: any) {
   const { id } = await props.params
   const supabase = await createClient()
 
-  const [{ data: campanha }, { data: leads }] = await Promise.all([
+  const [{ data: campanha }, { data: leads }, { data: materiais }] = await Promise.all([
     supabase
       .from('campanhas')
       .select('*')
@@ -29,9 +29,21 @@ export default async function CampanhaDetailPage(props: any) {
       .select('id, nome, sexo, data_nascimento, valor_plano_total, comissao_entrada, comissao_recorrente, percentual_renda, renda_estimada, status, criado_em')
       .eq('campanha_id', id)
       .order('valor_plano_total', { ascending: false }),
+    supabase
+      .from('materiais_campanha')
+      .select('*')
+      .eq('campanha_id', id)
+      .eq('ativo', true)
+      .order('criado_em', { ascending: true }),
   ])
 
   if (!campanha) notFound()
 
-  return <CampanhaDetailClient campanha={campanha as any} leads={(leads as any) ?? []} />
+  return (
+    <CampanhaDetailClient
+      campanha={campanha as any}
+      leads={(leads as any) ?? []}
+      materiais={(materiais as any) ?? []}
+    />
+  )
 }
