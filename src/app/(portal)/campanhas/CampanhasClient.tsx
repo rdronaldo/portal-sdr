@@ -8,9 +8,9 @@ import { createClient } from '@/lib/supabase/client'
 import { gerarCodigoCampanha } from '@/lib/campanhas'
 import {
   Plus, MoreVertical, Eye, Copy, Star, Pause, Play, XCircle,
-  Megaphone, Users, DollarSign, TrendingUp, Repeat, Clock,
-  MessageCircle, Phone, Smartphone, MessageSquare,
-  FileText, Mic, Video, Image,
+  Megaphone, Users, DollarSign, TrendingUp, Repeat, Target,
+  MessageCircle, Phone, MessageSquare, FileText, Mic, Video, Image,
+  Clock, ChevronRight,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -35,131 +35,46 @@ type Campanha = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmt(v: number) {
+function fmtShort(v: number) {
   if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace('.', ',')}M`
   if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
 }
 
 function fmtFull(v: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(v)
 }
 
-const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string; border: string }> = {
-  rascunho:  { label: 'Rascunho',   dot: '#94A3B8', bg: '#F8FAFC', text: '#64748B', border: '#CBD5E1' },
-  ativa:     { label: 'Ativa',      dot: '#02C39A', bg: '#ECFDF5', text: '#065F46', border: '#6EE7B7' },
-  pausada:   { label: 'Pausada',    dot: '#F59E0B', bg: '#FFFBEB', text: '#92400E', border: '#FDE68A' },
-  encerrada: { label: 'Encerrada',  dot: '#9CA3AF', bg: '#F1F5F9', text: '#374151', border: '#9CA3AF' },
-  champion:  { label: 'Champion',   dot: '#F59E0B', bg: '#FFFBEB', text: '#92400E', border: '#FDE68A' },
+const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+  rascunho:  { label: 'Rascunho',  dot: '#94A3B8', bg: 'rgba(148,163,184,0.2)',  text: '#94A3B8' },
+  ativa:     { label: 'Ativa',     dot: '#02C39A', bg: 'rgba(2,195,154,0.18)',   text: '#02C39A' },
+  pausada:   { label: 'Pausada',   dot: '#F59E0B', bg: 'rgba(245,158,11,0.18)',  text: '#F59E0B' },
+  encerrada: { label: 'Encerrada', dot: '#94A3B8', bg: 'rgba(148,163,184,0.2)',  text: '#94A3B8' },
+  champion:  { label: 'Champion',  dot: '#F59E0B', bg: 'rgba(245,158,11,0.18)',  text: '#F59E0B' },
 }
 
-const CANAL_CFG: Record<string, { icon: any; label: string; bg: string; color: string; border: string }> = {
-  whatsapp:      { icon: MessageCircle, label: 'WhatsApp',  bg: '#F0FDF4', color: '#16A34A', border: '#BBF7D0' },
-  whatsapp_meta: { icon: MessageCircle, label: 'WA Meta',   bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE' },
-  sms:           { icon: MessageSquare, label: 'SMS',        bg: '#F5F3FF', color: '#7C3AED', border: '#DDD6FE' },
-  telefone:      { icon: Phone,         label: 'Telefone',  bg: '#FFF7ED', color: '#EA580C', border: '#FED7AA' },
+const CANAL_META: Record<string, { icon: any; label: string }> = {
+  whatsapp:      { icon: MessageCircle, label: 'WhatsApp' },
+  whatsapp_meta: { icon: MessageCircle, label: 'WA Meta' },
+  sms:           { icon: MessageSquare, label: 'SMS' },
+  telefone:      { icon: Phone,         label: 'Telefone' },
 }
 
-const FORMATO_CFG: Record<string, { icon: any; label: string; bg: string; color: string; border: string }> = {
-  texto:  { icon: FileText, label: 'Texto',  bg: '#F0FDFA', color: '#028090', border: '#A7F3D0' },
-  audio:  { icon: Mic,      label: 'Áudio',  bg: '#FDF4FF', color: '#9333EA', border: '#E9D5FF' },
-  video:  { icon: Video,    label: 'Vídeo',  bg: '#FFF1F2', color: '#E11D48', border: '#FECDD3' },
-  imagem: { icon: Image,    label: 'Imagem', bg: '#FFFBEB', color: '#D97706', border: '#FDE68A' },
+const FORMATO_META: Record<string, { icon: any; label: string }> = {
+  texto:  { icon: FileText, label: 'Texto' },
+  audio:  { icon: Mic,      label: 'Áudio' },
+  video:  { icon: Video,    label: 'Vídeo' },
+  imagem: { icon: Image,    label: 'Imagem' },
 }
 
 const HORARIO_LABEL: Record<string, string> = {
-  todas_horas:  '24 horas',
-  dias_uteis:   'Seg – Sex',
+  todas_horas:   '24h',
+  dias_uteis:    'Seg–Sex',
   personalizado: 'Personalizado',
 }
 
-const VERSAO_LABEL: Record<string, { label: string; desc: string }> = {
-  A:   { label: 'Versão A',     desc: 'Teste único' },
-  AB:  { label: 'Versão A+B',   desc: 'Teste A/B' },
-  ABC: { label: 'Versão A+B+C', desc: 'Multi-variante' },
-}
-
-// ─── Stat Box ─────────────────────────────────────────────────────────────────
-
-function StatBox({ label, value, sub, accent, icon: Icon, iconBg, iconColor }: {
-  label: string; value: string; sub?: string; accent?: boolean
-  icon: any; iconBg: string; iconColor: string
-}) {
-  return (
-    <div className={`rounded-xl p-4 flex items-center gap-3 ${
-      accent ? 'bg-gradient-to-br from-[#028090] to-[#026d7a]' : 'bg-[#F8FAFC] border border-[#EEF2F7]'
-    }`}>
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: accent ? 'rgba(255,255,255,0.15)' : iconBg }}>
-        <Icon size={18} style={{ color: accent ? '#ffffff' : iconColor }} />
-      </div>
-      <div className="min-w-0">
-        <p className={`text-xs font-medium mb-0.5 ${accent ? 'text-white/70' : 'text-[#94A3B8]'}`}>{label}</p>
-        <p className={`text-base font-bold leading-none ${accent ? 'text-white' : 'text-[#0A1628]'}`}>{value}</p>
-        {sub && <p className={`text-xs mt-0.5 ${accent ? 'text-white/60' : 'text-[#CBD5E1]'}`}>{sub}</p>}
-      </div>
-    </div>
-  )
-}
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status, isChampion }: { status: string; isChampion: boolean }) {
-  const key = isChampion ? 'champion' : (status in STATUS_CONFIG ? status : 'rascunho')
-  const cfg = STATUS_CONFIG[key]
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
-      style={{ backgroundColor: cfg.bg, color: cfg.text, borderColor: cfg.border }}>
-      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: cfg.dot }} />
-      {isChampion ? '⭐ ' : ''}{cfg.label}
-    </span>
-  )
-}
-
-// ─── Actions Dropdown ─────────────────────────────────────────────────────────
-
-function ActionsDropdown({ campanha, onAction }: { campanha: Campanha; onAction: (action: string, id: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const actions = [
-    { key: 'ver',      label: 'Ver campanha',        icon: Eye },
-    { key: 'duplicar', label: 'Duplicar',             icon: Copy },
-    ...(!campanha.is_champion ? [{ key: 'champion', label: '⭐ Marcar CHAMPION', icon: Star }] : []),
-    ...(campanha.status === 'ativa'    ? [{ key: 'pausar',  label: 'Pausar',  icon: Pause }] : []),
-    ...(campanha.status === 'pausada'  || campanha.status === 'rascunho'
-                                       ? [{ key: 'ativar',  label: 'Ativar',  icon: Play  }] : []),
-    ...(campanha.status !== 'encerrada'? [{ key: 'encerrar',label: 'Encerrar',icon: XCircle }] : []),
-  ]
-
-  return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(v => !v)} aria-label="Ações"
-        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#F1F5F9] transition-colors">
-        <MoreVertical size={16} className="text-[#94A3B8]" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-10 z-20 bg-white border border-[#E2E8F0] rounded-xl shadow-xl py-1.5 w-52">
-          {actions.map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => { setOpen(false); onAction(key, campanha.id) }}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-left transition-colors ${
-                key === 'encerrar' ? 'text-[#EF4444] hover:bg-[#FEF2F2]' : 'text-[#0A1628] hover:bg-[#F4F8FB]'
-              }`}>
-              <Icon size={14} className="flex-shrink-0" />{label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+const VERSAO_LABEL: Record<string, string> = {
+  A: 'A', AB: 'A+B', ABC: 'A+B+C',
 }
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
@@ -169,7 +84,7 @@ function ConfirmModal({ title, body, confirmLabel, danger, onConfirm, onCancel, 
   onConfirm: () => void; onCancel: () => void; saving: boolean
 }) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
         <h3 className="text-base font-bold text-[#0A1628] mb-2">{title}</h3>
         <p className="text-sm text-[#64748B] mb-6">{body}</p>
@@ -190,153 +105,273 @@ function ConfirmModal({ title, body, confirmLabel, danger, onConfirm, onCancel, 
   )
 }
 
-// ─── Campaign Card ────────────────────────────────────────────────────────────
+// ─── Actions Menu (3 pontos) ──────────────────────────────────────────────────
 
-function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (action: string, id: string) => void }) {
-  const ticketMedio = c.total_leads > 0 ? c.valor_total_potencial / c.total_leads : 0
-  const pct = c.percentual_conversao ?? 0
-  const comEntradaEsp = c.comissao_entrada_potencial * (pct / 100)
-  const recorrenteEsp = c.comissao_recorrente_potencial * (pct / 100)
-  const versaoCfg = c.versao ? VERSAO_LABEL[c.versao] : null
+function ActionsMenu({ campanha, onAction }: { campanha: Campanha; onAction: (a: string, id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const items = [
+    { key: 'ver',      label: 'Ver campanha',         icon: Eye },
+    { key: 'duplicar', label: 'Duplicar campanha',    icon: Copy },
+    ...(!campanha.is_champion ? [{ key: 'champion', label: '⭐ Marcar CHAMPION', icon: Star }] : []),
+    ...(campanha.status === 'ativa'   ? [{ key: 'pausar',   label: 'Pausar',   icon: Pause   }] : []),
+    ...((campanha.status === 'pausada' || campanha.status === 'rascunho') ? [{ key: 'ativar', label: 'Ativar', icon: Play }] : []),
+    ...(campanha.status !== 'encerrada' ? [{ key: 'encerrar', label: 'Encerrar', icon: XCircle }] : []),
+  ]
 
   return (
-    <div className={`group bg-white rounded-2xl border transition-all duration-200 overflow-hidden hover:shadow-lg ${
-      c.is_champion
-        ? 'border-[#F59E0B] shadow-[0_0_0_1px_#F59E0B20]'
-        : 'border-[#E2E8F0] hover:border-[#028090]/30'
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(v => !v)} aria-label="Mais opções"
+        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
+        <MoreVertical size={18} className="text-white/60" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-10 z-30 bg-white border border-[#E2E8F0] rounded-xl shadow-2xl py-1.5 w-52">
+          {items.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => { setOpen(false); onAction(key, campanha.id) }}
+              className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors ${
+                key === 'encerrar' ? 'text-[#EF4444] hover:bg-[#FEF2F2]' : 'text-[#0A1628] hover:bg-[#F4F8FB]'
+              }`}>
+              <Icon size={14} className="flex-shrink-0" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Metric Mini-Card ─────────────────────────────────────────────────────────
+
+function MetricCard({ label, value, sub, icon: Icon, iconColor, accent }: {
+  label: string; value: string; sub?: string; icon: any; iconColor: string; accent?: boolean
+}) {
+  if (accent) {
+    return (
+      <div className="rounded-xl p-4 flex flex-col gap-2 flex-1"
+        style={{ background: 'linear-gradient(135deg, #028090 0%, #02C39A 100%)' }}>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">{label}</span>
+          <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+            <Icon size={14} className="text-white" />
+          </div>
+        </div>
+        <p className="text-2xl font-bold text-white leading-none">{value}</p>
+        {sub && <p className="text-[11px] text-white/60 leading-tight">{sub}</p>}
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-2 flex-1 bg-[#F4F8FB]">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">{label}</span>
+        <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center shadow-sm">
+          <Icon size={14} style={{ color: iconColor }} />
+        </div>
+      </div>
+      <p className="text-2xl font-bold text-[#0A1628] leading-none">{value}</p>
+      {sub && <p className="text-[11px] text-[#94A3B8] leading-tight">{sub}</p>}
+    </div>
+  )
+}
+
+// ─── Campaign Card ────────────────────────────────────────────────────────────
+
+function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: string) => void }) {
+  const pct = c.percentual_conversao ?? 0
+  const ticketMedio = c.total_leads > 0 ? c.valor_total_potencial / c.total_leads : 0
+  const comEntrada  = c.comissao_entrada_potencial  * (pct / 100)
+  const recorrente  = c.comissao_recorrente_potencial * (pct / 100)
+
+  const statusKey = c.is_champion ? 'champion' : (c.status in STATUS_CFG ? c.status : 'rascunho')
+  const sc = STATUS_CFG[statusKey]
+
+  // Metadata chips for header
+  const canais  = (c.canal    ?? []).map(k => CANAL_META[k]?.label).filter(Boolean).join(' · ')
+  const formatos= (c.formatos ?? []).map(k => FORMATO_META[k]?.label).filter(Boolean).join(' · ')
+  const horario = c.horario_tipo ? (HORARIO_LABEL[c.horario_tipo] ?? c.horario_tipo) : null
+  const metaParts = [canais, formatos, horario].filter(Boolean).join(' · ')
+
+  const showPausar   = c.status === 'ativa'
+  const showAtivar   = c.status === 'pausada' || c.status === 'rascunho'
+  const showEncerrar = c.status !== 'encerrada'
+
+  return (
+    <div className={`rounded-2xl overflow-hidden shadow-[0_2px_16px_rgba(0,0,0,0.08)] transition-all duration-200 hover:shadow-[0_4px_24px_rgba(0,0,0,0.14)] ${
+      c.is_champion ? 'ring-2 ring-[#F59E0B]' : ''
     }`}>
 
-      {/* ── Barra de acento superior ── */}
-      <div className={`h-1 w-full ${
-        c.is_champion ? 'bg-gradient-to-r from-[#F59E0B] to-[#FDE68A]' :
-        c.status === 'ativa' ? 'bg-gradient-to-r from-[#028090] to-[#02C39A]' :
-        c.status === 'pausada' ? 'bg-[#F59E0B]' : 'bg-[#E2E8F0]'
-      }`} />
-
-      <div className="p-5">
-        {/* ── Linha 1: Identificação + ações ── */}
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-
-            {/* Ícone avatar */}
-            <div className={`w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center text-white text-sm font-bold ${
-              c.is_champion ? 'bg-gradient-to-br from-[#F59E0B] to-[#EF4444]' :
-              c.status === 'ativa' ? 'bg-gradient-to-br from-[#028090] to-[#02C39A]' :
-              'bg-gradient-to-br from-[#94A3B8] to-[#CBD5E1]'
-            }`}>
-              {c.is_champion ? '⭐' : (c.nome_descritivo?.[0] ?? '?')}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              {/* Código + badges */}
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="font-mono text-[11px] font-bold text-[#94A3B8] tracking-wider uppercase">
-                  {c.codigo}
-                </span>
-                <StatusBadge status={c.status} isChampion={c.is_champion} />
-                {versaoCfg && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
-                    {versaoCfg.label}
-                  </span>
-                )}
-              </div>
-              {/* Nome */}
-              <Link href={`/campanhas/${c.id}`}
-                className="text-base font-bold text-[#0A1628] hover:text-[#028090] transition-colors block leading-tight">
-                {c.nome_descritivo || '—'}
-              </Link>
-              <p className="text-xs text-[#CBD5E1] mt-0.5">
-                Criado em {new Date(c.criado_em).toLocaleDateString('pt-BR')}
-              </p>
-            </div>
-          </div>
-          <ActionsDropdown campanha={c} onAction={onAction} />
-        </div>
-
-        {/* ── Linha 2: Chips canal + formato + horário ── */}
-        <div className="flex flex-wrap gap-2 mb-5">
-          {(c.canal ?? []).map(ch => {
-            const cfg = CANAL_CFG[ch]
-            if (!cfg) return null
-            const Icon = cfg.icon
-            return (
-              <span key={ch}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border"
-                style={{ backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.border }}>
-                <Icon size={12} /> {cfg.label}
-              </span>
-            )
-          })}
-          {(c.formatos ?? []).map(f => {
-            const cfg = FORMATO_CFG[f]
-            if (!cfg) return null
-            const Icon = cfg.icon
-            return (
-              <span key={f}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border"
-                style={{ backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.border }}>
-                <Icon size={12} /> {cfg.label}
-              </span>
-            )
-          })}
-          {c.horario_tipo && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#F1F5F9] text-[#475569] border border-[#E2E8F0]">
-              <Clock size={12} /> {HORARIO_LABEL[c.horario_tipo] ?? c.horario_tipo}
+      {/* ── HEADER: navy ── */}
+      <div className="px-6 py-5 flex items-start justify-between gap-4"
+        style={{
+          background: c.is_champion
+            ? 'linear-gradient(135deg, #0A1628 0%, #1a1200 100%)'
+            : '#0A1628',
+        }}>
+        <div className="min-w-0 flex-1">
+          {/* Código + badges */}
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <span className="font-mono text-[13px] font-bold text-white tracking-wide">
+              {c.codigo}
             </span>
-          )}
+
+            {/* Status badge */}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold"
+              style={{ backgroundColor: sc.bg, color: sc.text }}>
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.is_champion || c.status === 'ativa' ? 'animate-pulse' : ''}`}
+                style={{ backgroundColor: sc.dot }} />
+              {c.is_champion ? '⭐ ' : ''}{sc.label}
+            </span>
+
+            {/* Versão badge */}
+            {c.versao && (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/10 text-white/70">
+                Versão {VERSAO_LABEL[c.versao] ?? c.versao}
+              </span>
+            )}
+          </div>
+
+          {/* Nome */}
+          <Link href={`/campanhas/${c.id}`}
+            className="text-lg font-bold text-white hover:text-[#02C39A] transition-colors block leading-tight">
+            {c.nome_descritivo || '—'}
+          </Link>
+
+          {/* Metadados */}
+          <p className="text-[12px] text-[#64748B] mt-1.5 flex items-center gap-1 flex-wrap">
+            <Clock size={11} className="text-[#475569] flex-shrink-0" />
+            Criado em {new Date(c.criado_em).toLocaleDateString('pt-BR')}
+            {metaParts && <><span className="text-[#374151]">·</span><span>{metaParts}</span></>}
+          </p>
         </div>
 
-        {/* ── Linha 3: Métricas ── */}
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatBox
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Link href={`/campanhas/${c.id}`}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12px] font-medium transition-colors">
+            Ver <ChevronRight size={13} />
+          </Link>
+          <ActionsMenu campanha={c} onAction={onAction} />
+        </div>
+      </div>
+
+      {/* ── CORPO: métricas ── */}
+      <div className="bg-white px-6 py-5">
+        <div className="flex gap-3 flex-wrap sm:flex-nowrap">
+          <MetricCard
             label="Leads"
             value={c.total_leads.toLocaleString('pt-BR')}
+            sub="na base"
             icon={Users}
-            iconBg="#EFF6FF"
-            iconColor="#2563EB"
+            iconColor="#0A1628"
           />
-          <StatBox
+          <MetricCard
             label="Conversão est."
             value={`${pct}%`}
+            sub="taxa esperada"
             icon={TrendingUp}
-            iconBg="#F0FDF4"
-            iconColor="#16A34A"
+            iconColor="#028090"
           />
-          <StatBox
+          <MetricCard
             label="Potencial total"
-            value={fmt(c.valor_total_potencial)}
+            value={fmtShort(c.valor_total_potencial)}
             sub={fmtFull(c.valor_total_potencial)}
             icon={DollarSign}
-            iconBg="#F0FDFA"
-            iconColor="#028090"
+            iconColor="#02C39A"
             accent
           />
-          <StatBox
-            label="Com. entrada"
-            value={fmt(comEntradaEsp)}
-            sub={fmtFull(comEntradaEsp)}
-            icon={DollarSign}
-            iconBg="#F0FDFA"
-            iconColor="#028090"
-          />
-          <StatBox
+          <MetricCard
             label="Recorrente/mês"
-            value={fmt(recorrenteEsp)}
-            sub={fmtFull(recorrenteEsp)}
+            value={fmtShort(recorrente)}
+            sub={`com ${pct}% conv.`}
             icon={Repeat}
-            iconBg="#ECFDF5"
-            iconColor="#02C39A"
+            iconColor="#0A1628"
           />
-          <StatBox
+          <MetricCard
             label="Ticket médio"
-            value={ticketMedio > 0 ? fmt(ticketMedio) : '—'}
-            sub={ticketMedio > 0 ? fmtFull(ticketMedio) : undefined}
-            icon={DollarSign}
-            iconBg="#FFF7ED"
-            iconColor="#EA580C"
+            value={ticketMedio > 0 ? fmtShort(ticketMedio) : '—'}
+            sub={ticketMedio > 0 ? 'por lead' : undefined}
+            icon={Target}
+            iconColor="#F59E0B"
           />
         </div>
       </div>
+
+      {/* ── RODAPÉ: ações ── */}
+      <div className="bg-white border-t border-[#F1F5F9] px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
+        <Link href={`/campanhas/${c.id}`}
+          className="text-[13px] font-semibold text-[#028090] hover:text-[#026d7a] flex items-center gap-1 transition-colors">
+          Ver campanha completa <ChevronRight size={13} />
+        </Link>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Selecionar Propensos */}
+          <button onClick={() => onAction('ver', c.id)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#028090] text-white text-[12px] font-semibold hover:bg-[#026d7a] transition-colors">
+            <Target size={13} /> Selecionar Propensos
+          </button>
+
+          {/* Champion */}
+          {!c.is_champion && (
+            <button onClick={() => onAction('champion', c.id)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#F59E0B] text-[#92400E] text-[12px] font-semibold hover:bg-[#FFFBEB] transition-colors">
+              <Star size={13} /> Champion
+            </button>
+          )}
+
+          {/* Pausar */}
+          {showPausar && (
+            <button onClick={() => onAction('pausar', c.id)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#E2E8F0] text-[#64748B] text-[12px] font-semibold hover:bg-[#F8FAFC] transition-colors">
+              <Pause size={13} /> Pausar
+            </button>
+          )}
+
+          {/* Ativar */}
+          {showAtivar && (
+            <button onClick={() => onAction('ativar', c.id)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#A7F3D0] text-[#065F46] text-[12px] font-semibold hover:bg-[#ECFDF5] transition-colors">
+              <Play size={13} /> Ativar
+            </button>
+          )}
+
+          {/* Encerrar */}
+          {showEncerrar && (
+            <button onClick={() => onAction('encerrar', c.id)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#FECACA] text-[#EF4444] text-[12px] font-semibold hover:bg-[#FEF2F2] transition-colors">
+              <XCircle size={13} /> Encerrar
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Summary Card ─────────────────────────────────────────────────────────────
+
+function SummaryCard({ label, value, sub, iconBg, icon: Icon }: {
+  label: string; value: string; sub: string; iconBg: string; icon: any
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 flex-1"
+      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: iconBg }}>
+          <Icon size={20} className="text-white" />
+        </div>
+      </div>
+      <p className="text-[13px] font-semibold text-[#64748B] mb-1">{label}</p>
+      <p className="text-[40px] font-bold text-[#0A1628] leading-none mb-2">{value}</p>
+      <p className="text-[13px] text-[#94A3B8]">{sub}</p>
     </div>
   )
 }
@@ -402,85 +437,94 @@ export default function CampanhasClient({ campanhas: initial }: { campanhas: Cam
   }
 
   const modalConfig = modal ? ({
-    duplicar: { title: 'Duplicar campanha', body: 'Criar uma cópia desta campanha como rascunho?', confirmLabel: 'Duplicar', danger: false },
-    champion: { title: 'Marcar como CHAMPION', body: 'Esta campanha será destacada como a melhor versão. Confirmar?', confirmLabel: '⭐ Confirmar', danger: false },
-    encerrar: { title: 'Encerrar campanha', body: 'Esta ação encerrará permanentemente a campanha. Continuar?', confirmLabel: 'Encerrar', danger: true },
+    duplicar: { title: 'Duplicar campanha',   body: 'Criar uma cópia como rascunho?',                           confirmLabel: 'Duplicar',  danger: false },
+    champion: { title: 'Marcar como CHAMPION',body: 'Esta campanha será a versão de destaque. Confirmar?',       confirmLabel: '⭐ Confirmar', danger: false },
+    pausar:   { title: 'Pausar campanha',     body: 'A campanha ficará pausada. Você pode reativar depois.',     confirmLabel: 'Pausar',    danger: false },
+    ativar:   { title: 'Ativar campanha',     body: 'A campanha voltará a ficar ativa.',                         confirmLabel: 'Ativar',    danger: false },
+    encerrar: { title: 'Encerrar campanha',   body: 'Encerrará permanentemente. Esta ação não pode ser desfeita.', confirmLabel: 'Encerrar', danger: true  },
   } as any)[modal.type] : null
 
-  const ativas = campanhas.filter(c => c.status === 'ativa' || c.is_champion).length
-  const totalLeads = campanhas.reduce((s, c) => s + c.total_leads, 0)
-  const totalPotencial = campanhas.reduce((s, c) => s + c.valor_total_potencial, 0)
+  // ── Computed totals ──────────────────────────────────────────────────────────
+  const ativas       = campanhas.filter(c => c.status === 'ativa' || c.is_champion).length
+  const totalLeads   = campanhas.reduce((s, c) => s + c.total_leads, 0)
+  const totalPot     = campanhas.reduce((s, c) => s + c.valor_total_potencial, 0)
 
   return (
-    <div className="p-8 min-h-screen bg-[#F8FAFC]">
-      {/* ── Header ── */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#0A1628]">Campanhas</h1>
-          <p className="text-sm text-[#94A3B8] mt-0.5">
-            {campanhas.length} campanha{campanhas.length !== 1 ? 's' : ''} · {ativas} ativa{ativas !== 1 ? 's' : ''} · {totalLeads.toLocaleString('pt-BR')} leads
-          </p>
-        </div>
-        <Link href="/campanhas/nova"
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#028090] text-white text-sm font-semibold hover:bg-[#026d7a] transition-colors shadow-sm">
-          <Plus size={16} /> Nova Campanha
-        </Link>
-      </div>
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <div className="max-w-6xl mx-auto px-8 py-8">
 
-      {/* ── Resumo rápido ── */}
-      {campanhas.length > 0 && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#EFF6FF] flex items-center justify-center">
-              <Megaphone size={18} className="text-[#2563EB]" />
-            </div>
-            <div>
-              <p className="text-xs text-[#94A3B8] font-medium">Campanhas ativas</p>
-              <p className="text-xl font-bold text-[#0A1628]">{ativas}</p>
-            </div>
+        {/* ══ PARTE 1 — HEADER ══════════════════════════════════════════════ */}
+        <div className="flex items-start justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-[28px] font-bold text-[#0A1628] leading-tight">Campanhas</h1>
+            <p className="text-[14px] text-[#64748B] mt-1">
+              {ativas} campanha{ativas !== 1 ? 's' : ''} ativa{ativas !== 1 ? 's' : ''}
+              {' · '}{totalLeads.toLocaleString('pt-BR')} leads no total
+            </p>
           </div>
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F0FDFA] flex items-center justify-center">
-              <Users size={18} className="text-[#028090]" />
-            </div>
-            <div>
-              <p className="text-xs text-[#94A3B8] font-medium">Total de leads</p>
-              <p className="text-xl font-bold text-[#0A1628]">{totalLeads.toLocaleString('pt-BR')}</p>
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-[#028090] to-[#02C39A] rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <DollarSign size={18} className="text-white" />
-            </div>
-            <div>
-              <p className="text-xs text-white/70 font-medium">Potencial total</p>
-              <p className="text-xl font-bold text-white">{fmt(totalPotencial)}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Lista ── */}
-      {campanhas.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#E2E8F0] py-20 text-center">
-          <div className="w-16 h-16 bg-[#F1F5F9] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Megaphone size={28} className="text-[#94A3B8]" />
-          </div>
-          <p className="text-base font-semibold text-[#0A1628]">Nenhuma campanha ainda</p>
-          <p className="text-sm text-[#94A3B8] mt-1 mb-6">Clique em + Nova Campanha para começar.</p>
           <Link href="/campanhas/nova"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#028090] text-white text-sm font-semibold hover:bg-[#026d7a] transition-colors">
-            <Plus size={15} /> Nova Campanha
+            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#028090] text-white text-[14px] font-bold hover:bg-[#026d7a] transition-colors shadow-sm flex-shrink-0">
+            <Plus size={16} /> Nova Campanha
           </Link>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {campanhas.map(c => (
-            <CampanhaCard key={c.id} c={c} onAction={handleAction} />
-          ))}
-        </div>
-      )}
 
+        {/* ══ PARTE 2 — CARDS RESUMO ════════════════════════════════════════ */}
+        {campanhas.length > 0 && (
+          <div className="flex gap-5 mb-8">
+            <SummaryCard
+              label="Campanhas ativas"
+              value={String(ativas)}
+              sub={`de ${campanhas.length} campanha${campanhas.length !== 1 ? 's' : ''} total`}
+              iconBg="#028090"
+              icon={Megaphone}
+            />
+            <SummaryCard
+              label="Total de leads"
+              value={totalLeads.toLocaleString('pt-BR')}
+              sub="em todas as campanhas"
+              iconBg="#0A1628"
+              icon={Users}
+            />
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 flex-1"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-10 h-10 rounded-full bg-[#02C39A] flex items-center justify-center flex-shrink-0">
+                  <DollarSign size={20} className="text-white" />
+                </div>
+              </div>
+              <p className="text-[13px] font-semibold text-[#64748B] mb-1">Potencial total</p>
+              <p className="text-[32px] font-bold text-[#0A1628] leading-none mb-2">{fmtFull(totalPot)}</p>
+              <p className="text-[13px] text-[#94A3B8]">em mensalidades</p>
+            </div>
+          </div>
+        )}
+
+        {/* ══ PARTE 3/4 — LISTA / EMPTY STATE ══════════════════════════════ */}
+        {campanhas.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] py-24 text-center"
+            style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div className="w-20 h-20 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-6">
+              <Megaphone size={36} className="text-[#CBD5E1]" />
+            </div>
+            <h2 className="text-[20px] font-bold text-[#0A1628] mb-2">Nenhuma campanha ainda</h2>
+            <p className="text-[14px] text-[#64748B] mb-8 max-w-sm mx-auto">
+              Crie sua primeira campanha e comece a qualificar leads automaticamente.
+            </p>
+            <Link href="/campanhas/nova"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#028090] text-white text-[14px] font-bold hover:bg-[#026d7a] transition-colors">
+              <Plus size={16} /> Criar primeira campanha
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {campanhas.map(c => (
+              <CampanhaCard key={c.id} c={c} onAction={handleAction} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Modal de confirmação ── */}
       {modal && modalConfig && (
         <ConfirmModal
           {...modalConfig}
