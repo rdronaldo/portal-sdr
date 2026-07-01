@@ -33,8 +33,7 @@ type Campanha = {
   // stats computadas no server
   pct_masc: number | null
   pct_fem: number | null
-  faixa_dominante: string | null
-  dist_etaria: Record<string, number>
+  faixas_top3: string | null
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -367,11 +366,11 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
         />
         <MetricDivider />
 
-        {/* 13. Faixa etária dominante */}
+        {/* 13. Top 3 faixas etárias */}
         <MetricCell
           label="Faixa Etária"
-          value={c.faixa_dominante ?? '—'}
-          sub={c.faixa_dominante ? 'maior grupo' : undefined}
+          value={c.faixas_top3 ? c.faixas_top3.split(' · ')[0] : '—'}
+          sub={c.faixas_top3 ? c.faixas_top3.split(' · ').slice(1).join(' · ') : undefined}
           valueColor="#7C3AED"
           wide
         />
