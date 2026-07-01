@@ -30,6 +30,11 @@ type Campanha = {
   formatos: string[] | null
   horario_tipo: string | null
   criado_em: string
+  // stats computadas no server
+  pct_masc: number | null
+  pct_fem: number | null
+  faixa_dominante: string | null
+  dist_etaria: Record<string, number>
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -134,12 +139,12 @@ function MetricCell({ label, value, sub, valueColor, wide }: {
   label: string; value: string; sub?: string; valueColor?: string; wide?: boolean
 }) {
   return (
-    <div className={`flex flex-col justify-center px-4 py-3 ${wide ? 'min-w-[120px]' : 'min-w-[80px]'}`}>
+    <div className={`flex flex-col justify-center px-3 py-3 ${wide ? 'min-w-[110px]' : 'min-w-[72px]'}`}>
       <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] mb-1 leading-none whitespace-nowrap">
         {label}
       </p>
       <p className="font-bold leading-none whitespace-nowrap"
-        style={{ color: valueColor ?? '#0A1628', fontSize: wide ? '22px' : '20px' }}>
+        style={{ color: valueColor ?? '#0A1628', fontSize: wide ? '19px' : '17px' }}>
         {value}
       </p>
       {sub && (
@@ -250,8 +255,18 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
         <ActionsMenu campanha={c} onAction={onAction} />
       </div>
 
-      {/* ── LINHA 2 — Faixa de 8 métricas ── */}
+      {/* ── LINHA 2 — Faixa de métricas ── */}
       <div className="bg-white flex items-center overflow-x-auto">
+
+        {/* 1. Criado */}
+        <MetricCell
+          label="Criado"
+          value={new Date(c.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+          valueColor="#64748B"
+        />
+        <MetricDivider />
+
+        {/* 2. Leads */}
         <MetricCell
           label="Leads"
           value={c.total_leads.toLocaleString('pt-BR')}
@@ -259,55 +274,108 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
           valueColor="#0A1628"
         />
         <MetricDivider />
+
+        {/* 3. % Conversão */}
         <MetricCell
-          label="Conv."
+          label="% Conv."
           value={`${pct}%`}
-          sub={`${leadsEstim} leads`}
+          sub="taxa estimada"
           valueColor="#028090"
         />
         <MetricDivider />
+
+        {/* 4. Leads Estimados */}
         <MetricCell
-          label="Potencial total"
+          label="Leads Est."
+          value={leadsEstim.toLocaleString('pt-BR')}
+          sub={`com ${pct}% conv.`}
+          valueColor="#0A1628"
+        />
+        <MetricDivider />
+
+        {/* 5. Potencial Total */}
+        <MetricCell
+          label="Potencial Total"
           value={fmtShort(c.valor_total_potencial)}
           sub={fmtFull(c.valor_total_potencial)}
           valueColor="#028090"
           wide
         />
         <MetricDivider />
+
+        {/* 6. Comissão Entrada (1.5x = potencial bruto) */}
         <MetricCell
-          label="Com. entrada"
+          label="Com. Entrada (1.5x)"
+          value={fmtShort(c.comissao_entrada_potencial)}
+          sub={fmtFull(c.comissao_entrada_potencial)}
+          valueColor="#02C39A"
+          wide
+        />
+        <MetricDivider />
+
+        {/* 7. Mensalidades Esperadas (potencial × conv.) */}
+        <MetricCell
+          label="Mensalid. Esp."
+          value={fmtShort(c.valor_total_potencial * pct / 100)}
+          sub={`${pct}% do potencial`}
+          valueColor="#0A1628"
+          wide
+        />
+        <MetricDivider />
+
+        {/* 8. Comissão Entrada estimada (× conv.) */}
+        <MetricCell
+          label="Com. Entrada Est."
           value={fmtShort(comEntrada)}
           sub={`${pct}% conv.`}
           valueColor="#02C39A"
           wide
         />
         <MetricDivider />
-        <MetricCell
-          label="Leads estim."
-          value={leadsEstim.toLocaleString('pt-BR')}
-          sub={`${pct}% conv.`}
-          valueColor="#0A1628"
-        />
-        <MetricDivider />
-        <MetricCell
-          label="Recorrente/mês"
-          value={fmtShort(recorrente)}
-          sub={`${pct}% conv.`}
-          valueColor="#0A1628"
-          wide
-        />
-        <MetricDivider />
+
+        {/* 9. Canal */}
         <MetricCell
           label="Canal"
           value={canalLabel}
           valueColor="#0A1628"
         />
         <MetricDivider />
+
+        {/* 10. Horário */}
         <MetricCell
           label="Horário"
           value={horarioLabel}
           valueColor="#0A1628"
         />
+        <MetricDivider />
+
+        {/* 11. % Masculino */}
+        <MetricCell
+          label="Masculino"
+          value={c.pct_masc !== null ? `${c.pct_masc}%` : '—'}
+          sub={c.pct_masc !== null ? 'dos leads' : undefined}
+          valueColor="#2563EB"
+        />
+        <MetricDivider />
+
+        {/* 12. % Feminino */}
+        <MetricCell
+          label="Feminino"
+          value={c.pct_fem !== null ? `${c.pct_fem}%` : '—'}
+          sub={c.pct_fem !== null ? 'dos leads' : undefined}
+          valueColor="#DB2777"
+        />
+        <MetricDivider />
+
+        {/* 13. Faixa etária dominante */}
+        <MetricCell
+          label="Faixa Etária"
+          value={c.faixa_dominante ?? '—'}
+          sub={c.faixa_dominante ? 'maior grupo' : undefined}
+          valueColor="#7C3AED"
+          wide
+        />
+
       </div>
 
       {/* ── RODAPÉ ── */}
