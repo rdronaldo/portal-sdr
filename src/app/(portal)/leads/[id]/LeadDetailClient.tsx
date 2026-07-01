@@ -796,7 +796,7 @@ export default function LeadDetailClient({
   }, [trans])
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-6 lg:p-8 w-full">
       {/* Back button */}
       <button
         onClick={() => router.back()}

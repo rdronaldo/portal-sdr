@@ -135,15 +135,15 @@ function MetricCell({ label, value, sub, valueColor, wide }: {
 }) {
   return (
     <div className={`flex flex-col justify-center px-4 py-3 ${wide ? 'min-w-[120px]' : 'min-w-[80px]'}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#64748B] mb-1 leading-none whitespace-nowrap">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B] mb-1 leading-none whitespace-nowrap">
         {label}
       </p>
-      <p className="text-[18px] font-bold leading-none whitespace-nowrap"
-        style={{ color: valueColor ?? '#0A1628', fontSize: wide ? '20px' : '18px' }}>
+      <p className="font-bold leading-none whitespace-nowrap"
+        style={{ color: valueColor ?? '#0A1628', fontSize: wide ? '22px' : '20px' }}>
         {value}
       </p>
       {sub && (
-        <p className="text-[11px] text-[#94A3B8] leading-tight mt-0.5 whitespace-nowrap">{sub}</p>
+        <p className="text-[12px] text-[#94A3B8] leading-tight mt-0.5 whitespace-nowrap">{sub}</p>
       )}
     </div>
   )
@@ -204,7 +204,7 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
         }}>
 
         {/* Código */}
-        <span className="font-mono text-[16px] font-bold text-white tracking-wide flex-shrink-0">
+        <span className="font-mono text-[17px] font-bold text-white tracking-wide flex-shrink-0">
           {c.codigo}
         </span>
 
@@ -380,10 +380,10 @@ function SummaryCard({ label, value, sub, iconBg, accentColor, icon: Icon, large
             style={{ backgroundColor: iconBg }}>
             <Icon size={24} className="text-white" />
           </div>
-          <p className="text-[13px] font-semibold text-[#64748B]">{label}</p>
+          <p className="text-[14px] font-semibold text-[#64748B]">{label}</p>
         </div>
         <p className="font-bold text-[#0A1628] leading-none mb-2"
-          style={{ fontSize: large ? '32px' : '48px' }}>{value}</p>
+          style={{ fontSize: large ? '32px' : '36px' }}>{value}</p>
         <p className="text-[13px] text-[#94A3B8]">{sub}</p>
       </div>
     </div>
@@ -465,7 +465,7 @@ export default function CampanhasClient({ campanhas: initial }: { campanhas: Cam
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
-      <div className="max-w-6xl mx-auto px-8 py-8">
+      <div className="w-full px-8 py-8">
 
         {/* ══ PARTE 1 — HEADER ══════════════════════════════════════════════ */}
         <div className="flex items-start justify-between gap-4 mb-8">
@@ -484,7 +484,7 @@ export default function CampanhasClient({ campanhas: initial }: { campanhas: Cam
 
         {/* ══ PARTE 2 — CARDS RESUMO ════════════════════════════════════════ */}
         {campanhas.length > 0 && (
-          <div className="flex gap-5 mb-8">
+          <div className="grid grid-cols-3 gap-4 mb-8">
             <SummaryCard
               label="Campanhas ativas"
               value={String(ativas)}

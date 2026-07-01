@@ -1007,7 +1007,7 @@ export default function CampanhaDetailClient({ campanha: initial, leads: initial
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-8 w-full space-y-8">
       {/* Header */}
       <div>
         <Link href="/campanhas" className="inline-flex items-center gap-1 text-sm text-[#64748B] hover:text-[#0A1628] mb-4 transition-colors">
