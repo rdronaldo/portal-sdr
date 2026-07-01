@@ -151,34 +151,46 @@ function ActionsMenu({ campanha, onAction }: { campanha: Campanha; onAction: (a:
 
 // ─── Metric Mini-Card ─────────────────────────────────────────────────────────
 
-function MetricCard({ label, value, sub, icon: Icon, iconColor, accent }: {
-  label: string; value: string; sub?: string; icon: any; iconColor: string; accent?: boolean
+function MetricCard({ label, value, sub, icon: Icon, iconColor, valueColor, accent }: {
+  label: string; value: string; sub?: string; icon: any; iconColor: string; valueColor?: string; accent?: boolean
 }) {
   if (accent) {
     return (
-      <div className="rounded-xl p-4 flex flex-col gap-2 flex-1"
-        style={{ background: 'linear-gradient(135deg, #028090 0%, #02C39A 100%)' }}>
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">{label}</span>
-          <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-            <Icon size={14} className="text-white" />
+      <div className="rounded-xl flex flex-col flex-1 min-w-[140px]"
+        style={{
+          background: '#028090',
+          padding: '24px',
+          boxShadow: '0 4px 16px rgba(2,128,144,0.35)',
+        }}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-semibold uppercase tracking-widest"
+            style={{ color: 'rgba(255,255,255,0.8)' }}>{label}</span>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+            <Icon size={16} className="text-white" />
           </div>
         </div>
-        <p className="text-2xl font-bold text-white leading-none">{value}</p>
-        {sub && <p className="text-[11px] text-white/60 leading-tight">{sub}</p>}
+        <p className="text-[36px] font-bold text-white leading-none mb-1">{value}</p>
+        {sub && <p className="text-[13px] leading-tight" style={{ color: 'rgba(255,255,255,0.8)' }}>{sub}</p>}
       </div>
     )
   }
   return (
-    <div className="rounded-xl p-4 flex flex-col gap-2 flex-1 bg-[#F4F8FB]">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">{label}</span>
-        <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center shadow-sm">
-          <Icon size={14} style={{ color: iconColor }} />
+    <div className="rounded-xl flex flex-col flex-1 min-w-[120px]"
+      style={{
+        background: '#ffffff',
+        border: '1px solid #E2E8F0',
+        padding: '20px',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+      }}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-semibold uppercase tracking-widest text-[#64748B]">{label}</span>
+        <div className="w-8 h-8 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center">
+          <Icon size={15} style={{ color: iconColor }} />
         </div>
       </div>
-      <p className="text-2xl font-bold text-[#0A1628] leading-none">{value}</p>
-      {sub && <p className="text-[11px] text-[#94A3B8] leading-tight">{sub}</p>}
+      <p className="text-[32px] font-bold leading-none mb-1" style={{ color: valueColor ?? '#0A1628' }}>{value}</p>
+      {sub && <p className="text-[12px] text-[#64748B] leading-tight">{sub}</p>}
     </div>
   )
 }
@@ -209,23 +221,23 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
       c.is_champion ? 'ring-2 ring-[#F59E0B]' : ''
     }`}>
 
-      {/* ── HEADER: navy ── */}
+      {/* ── HEADER: gradiente teal ── */}
       <div className="px-6 py-5 flex items-start justify-between gap-4"
         style={{
           background: c.is_champion
-            ? 'linear-gradient(135deg, #0A1628 0%, #1a1200 100%)'
-            : '#0A1628',
+            ? 'linear-gradient(135deg, #028090 0%, #014D59 60%, #7B5E00 100%)'
+            : 'linear-gradient(135deg, #028090 0%, #034E59 100%)',
         }}>
         <div className="min-w-0 flex-1">
           {/* Código + badges */}
-          <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <span className="font-mono text-[13px] font-bold text-white tracking-wide">
+          <div className="flex items-center gap-2 flex-wrap mb-2">
+            <span className="font-mono text-[20px] font-bold text-white tracking-wide leading-none">
               {c.codigo}
             </span>
 
-            {/* Status badge */}
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold"
-              style={{ backgroundColor: sc.bg, color: sc.text }}>
+            {/* Status badge — fundo branco, texto teal */}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold bg-white"
+              style={{ color: sc.dot === '#02C39A' ? '#028090' : (sc.dot === '#F59E0B' ? '#92400E' : '#64748B') }}>
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.is_champion || c.status === 'ativa' ? 'animate-pulse' : ''}`}
                 style={{ backgroundColor: sc.dot }} />
               {c.is_champion ? '⭐ ' : ''}{sc.label}
@@ -233,7 +245,8 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
 
             {/* Versão badge */}
             {c.versao && (
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/10 text-white/70">
+              <span className="px-2.5 py-1 rounded-full text-[12px] font-bold text-white"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
                 Versão {VERSAO_LABEL[c.versao] ?? c.versao}
               </span>
             )}
@@ -241,21 +254,22 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
 
           {/* Nome */}
           <Link href={`/campanhas/${c.id}`}
-            className="text-lg font-bold text-white hover:text-[#02C39A] transition-colors block leading-tight">
+            className="text-[14px] font-semibold text-white hover:text-[#A7F3D0] transition-colors block leading-snug mb-1.5">
             {c.nome_descritivo || '—'}
           </Link>
 
           {/* Metadados */}
-          <p className="text-[12px] text-[#64748B] mt-1.5 flex items-center gap-1 flex-wrap">
-            <Clock size={11} className="text-[#475569] flex-shrink-0" />
+          <p className="text-[12px] flex items-center gap-1.5 flex-wrap"
+            style={{ color: 'rgba(255,255,255,0.75)' }}>
+            <Clock size={11} className="flex-shrink-0" />
             Criado em {new Date(c.criado_em).toLocaleDateString('pt-BR')}
-            {metaParts && <><span className="text-[#374151]">·</span><span>{metaParts}</span></>}
+            {metaParts && <><span className="opacity-50">·</span><span>{metaParts}</span></>}
           </p>
         </div>
 
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Link href={`/campanhas/${c.id}`}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12px] font-medium transition-colors">
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-[#028090] text-[12px] font-bold hover:bg-[#F0FDFA] transition-colors">
             Ver <ChevronRight size={13} />
           </Link>
           <ActionsMenu campanha={c} onAction={onAction} />
@@ -271,6 +285,7 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
             sub="na base"
             icon={Users}
             iconColor="#0A1628"
+            valueColor="#0A1628"
           />
           <MetricCard
             label="Conversão est."
@@ -278,6 +293,7 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
             sub="taxa esperada"
             icon={TrendingUp}
             iconColor="#028090"
+            valueColor="#028090"
           />
           <MetricCard
             label="Potencial total"
@@ -293,6 +309,7 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
             sub={`com ${pct}% conv.`}
             icon={Repeat}
             iconColor="#0A1628"
+            valueColor="#0A1628"
           />
           <MetricCard
             label="Ticket médio"
@@ -300,53 +317,59 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
             sub={ticketMedio > 0 ? 'por lead' : undefined}
             icon={Target}
             iconColor="#F59E0B"
+            valueColor="#F59E0B"
           />
         </div>
       </div>
 
       {/* ── RODAPÉ: ações ── */}
-      <div className="bg-white border-t border-[#F1F5F9] px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
+      <div className="bg-white border-t border-[#E2E8F0] px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
         <Link href={`/campanhas/${c.id}`}
-          className="text-[13px] font-semibold text-[#028090] hover:text-[#026d7a] flex items-center gap-1 transition-colors">
-          Ver campanha completa <ChevronRight size={13} />
+          className="text-[14px] font-semibold text-[#028090] hover:text-[#026d7a] flex items-center gap-1 transition-colors">
+          Ver campanha completa <ChevronRight size={14} />
         </Link>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Selecionar Propensos */}
           <button onClick={() => onAction('ver', c.id)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#028090] text-white text-[12px] font-semibold hover:bg-[#026d7a] transition-colors">
-            <Target size={13} /> Selecionar Propensos
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#028090] text-white text-[12px] font-semibold hover:bg-[#026d7a] transition-colors"
+            style={{ padding: '10px 16px' }}>
+            <Target size={14} /> Selecionar Propensos
           </button>
 
           {/* Champion */}
           {!c.is_champion && (
             <button onClick={() => onAction('champion', c.id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#F59E0B] text-[#92400E] text-[12px] font-semibold hover:bg-[#FFFBEB] transition-colors">
-              <Star size={13} /> Champion
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#F59E0B] text-[#92400E] bg-white text-[12px] font-semibold hover:bg-[#FFFBEB] transition-colors"
+              style={{ padding: '10px 16px' }}>
+              <Star size={14} /> Champion
             </button>
           )}
 
           {/* Pausar */}
           {showPausar && (
             <button onClick={() => onAction('pausar', c.id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#E2E8F0] text-[#64748B] text-[12px] font-semibold hover:bg-[#F8FAFC] transition-colors">
-              <Pause size={13} /> Pausar
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E2E8F0] text-[#64748B] bg-white text-[12px] font-semibold hover:bg-[#F8FAFC] transition-colors"
+              style={{ padding: '10px 16px' }}>
+              <Pause size={14} /> Pausar
             </button>
           )}
 
           {/* Ativar */}
           {showAtivar && (
             <button onClick={() => onAction('ativar', c.id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#A7F3D0] text-[#065F46] text-[12px] font-semibold hover:bg-[#ECFDF5] transition-colors">
-              <Play size={13} /> Ativar
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#A7F3D0] text-[#065F46] bg-white text-[12px] font-semibold hover:bg-[#ECFDF5] transition-colors"
+              style={{ padding: '10px 16px' }}>
+              <Play size={14} /> Ativar
             </button>
           )}
 
           {/* Encerrar */}
           {showEncerrar && (
             <button onClick={() => onAction('encerrar', c.id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#FECACA] text-[#EF4444] text-[12px] font-semibold hover:bg-[#FEF2F2] transition-colors">
-              <XCircle size={13} /> Encerrar
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#FECACA] text-[#EF4444] bg-white text-[12px] font-semibold hover:bg-[#FEF2F2] transition-colors"
+              style={{ padding: '10px 16px' }}>
+              <XCircle size={14} /> Encerrar
             </button>
           )}
         </div>
@@ -357,21 +380,27 @@ function CampanhaCard({ c, onAction }: { c: Campanha; onAction: (a: string, id: 
 
 // ─── Summary Card ─────────────────────────────────────────────────────────────
 
-function SummaryCard({ label, value, sub, iconBg, icon: Icon }: {
-  label: string; value: string; sub: string; iconBg: string; icon: any
+function SummaryCard({ label, value, sub, iconBg, accentColor, icon: Icon, large }: {
+  label: string; value: string; sub: string; iconBg: string; accentColor: string; icon: any; large?: boolean
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 flex-1"
-      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: iconBg }}>
-          <Icon size={20} className="text-white" />
+    <div className="bg-white rounded-2xl border-t-4 border-[#E2E8F0] flex-1 overflow-hidden"
+      style={{
+        borderTopColor: accentColor,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+      }}>
+      <div style={{ padding: '28px' }}>
+        <div className="flex items-center gap-4 mb-5">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: iconBg }}>
+            <Icon size={24} className="text-white" />
+          </div>
+          <p className="text-[13px] font-semibold text-[#64748B]">{label}</p>
         </div>
+        <p className="font-bold text-[#0A1628] leading-none mb-2"
+          style={{ fontSize: large ? '32px' : '48px' }}>{value}</p>
+        <p className="text-[13px] text-[#94A3B8]">{sub}</p>
       </div>
-      <p className="text-[13px] font-semibold text-[#64748B] mb-1">{label}</p>
-      <p className="text-[40px] font-bold text-[#0A1628] leading-none mb-2">{value}</p>
-      <p className="text-[13px] text-[#94A3B8]">{sub}</p>
     </div>
   )
 }
@@ -476,6 +505,7 @@ export default function CampanhasClient({ campanhas: initial }: { campanhas: Cam
               value={String(ativas)}
               sub={`de ${campanhas.length} campanha${campanhas.length !== 1 ? 's' : ''} total`}
               iconBg="#028090"
+              accentColor="#028090"
               icon={Megaphone}
             />
             <SummaryCard
@@ -483,19 +513,18 @@ export default function CampanhasClient({ campanhas: initial }: { campanhas: Cam
               value={totalLeads.toLocaleString('pt-BR')}
               sub="em todas as campanhas"
               iconBg="#0A1628"
+              accentColor="#0A1628"
               icon={Users}
             />
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 flex-1"
-              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-10 h-10 rounded-full bg-[#02C39A] flex items-center justify-center flex-shrink-0">
-                  <DollarSign size={20} className="text-white" />
-                </div>
-              </div>
-              <p className="text-[13px] font-semibold text-[#64748B] mb-1">Potencial total</p>
-              <p className="text-[32px] font-bold text-[#0A1628] leading-none mb-2">{fmtFull(totalPot)}</p>
-              <p className="text-[13px] text-[#94A3B8]">em mensalidades</p>
-            </div>
+            <SummaryCard
+              label="Potencial total"
+              value={fmtFull(totalPot)}
+              sub="em mensalidades"
+              iconBg="#02C39A"
+              accentColor="#02C39A"
+              icon={DollarSign}
+              large
+            />
           </div>
         )}
 
